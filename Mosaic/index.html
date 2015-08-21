@@ -1,0 +1,198 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<title>Ludum Dare Mosaic - by William Edwards</title>
+<script type="text/javascript">
+
+var ld, games, idx, targets, filters, filter, jam;
+var mosaic, scale;
+
+function objLength(obj) {
+	if(Object.keys) return Object.keys(obj).length;
+	var count = 0;
+	for (k in obj) if (obj.hasOwnProperty(k)) count++;
+	return count;
+}
+
+function loadJSON(path, callback, post) {   
+	var req = new XMLHttpRequest();
+	req.open('GET', path, true);
+	req.overrideMimeType("application/json");
+	req.onreadystatechange = function () {
+		if (req.readyState == 4 && req.status == "200")
+			callback(JSON.parse(req.responseText));
+	};
+	req.send(post || null);  
+}
+
+function loadIdx(data) {
+	var img = document.getElementById("img");
+	var w = Math.trunc(img.naturalWidth / mosaic.thumb_width);
+	var h = Math.trunc(img.naturalHeight / mosaic.thumb_height);
+	console.log("there are " + w + " x " + h + " tiles (" + (w*h) + ")");
+	idx = new Array(h);
+	for(var y=0; y<h; y++)
+		idx[y] = new Array(w);
+	for(var i in data)
+		idx[Math.trunc(data[i][1] / mosaic.thumb_height)][Math.trunc(data[i][0] / mosaic.thumb_width)] = i;
+}
+
+function set_filter(by) {
+	if(filter == filters[by]) return;
+	filter = filters[by];
+	var buttons = document.getElementsByTagName("button");
+	for(var i=0; i<buttons.length; i++)
+		buttons[i].disabled = buttons[i].firstChild.nodeValue.indexOf(by) == 0;
+	if(!set_filter.used) {
+		set_filter.used = true;
+		alert("Games matching your filter will blink red-white;\nGames *not* matching your filter will blink black+white");
+	}
+}
+
+function init() {
+	var img = document.getElementById("img");
+	var zoom = document.getElementById("zoom");
+	var zoom_sel = document.getElementById("zoom_sel");
+	var zoom_info = document.getElementById("zoom_info");
+	zoom_info.width = zoom_sel.innerWidth;
+	var current;
+	window.onresize = function() {
+		if(!mosaic) return;
+		var W = window.innerWidth || 1, H = (window.innerHeight - img.parentNode.offsetTop) || 1;
+		var w = img.naturalWidth || 1, h = img.naturalHeight || 1;
+		scale = Math.min(1, W/w, H/h);
+		w *= scale; h *= scale;
+		img.style.width = w + "px"; img.style.height = h + "px";
+		img.style.left = ((W-w) / 2) + "px"; img.style.top = (img.parentNode.offsetTop + (H-h) / 2) + "px";
+	};
+	img.addEventListener("mousemove", function(evt) {
+		if(!mosaic) return;
+		var hzw = Math.trunc(zoom.offsetWidth / 2), hzh = Math.trunc(zoom.offsetHeight / 2);
+		zoom.style.left = Math.min(window.innerWidth - zoom.offsetWidth, Math.max(0, evt.clientX - hzw)) + "px";
+		zoom.style.top = Math.min(window.innerHeight - zoom.offsetHeight, Math.max(0, evt.clientY - hzh)) + "px";
+		zoom.style.display = "block";
+		var x = Math.trunc((evt.clientX - img.offsetLeft) / scale);
+		var y = Math.trunc((evt.clientY - img.offsetTop) / scale);
+		zoom.scrollLeft = x - hzw;
+		zoom.scrollTop = y - hzh;
+		x = Math.trunc(x / mosaic.thumb_width);
+		y = Math.trunc(y / mosaic.thumb_height);
+		current = null;
+		if(games && idx) {
+			current = idx[y];
+			if(current && current[x]) {
+				current = current[x];
+				zoom_info.innerHTML = "<b>" + games[current][3] + "</b> by <i>" + games[current][4];
+				zoom_info.style.left = zoom.scrollLeft + "px";
+				zoom_info.style.top = zoom.scrollTop + "px";
+			}
+		}
+		zoom_info.style.display = current? "block": "none";
+		zoom_sel.style.left = (mosaic.thumb_width * x - 5) + "px";
+		zoom_sel.style.top = (mosaic.thumb_height * y - 5) + "px";
+		zoom_sel.style.borderColor = !filter || filter[current]? "red": "black";
+	});
+	img.addEventListener("click", function() {
+		if(current)
+			window.open("http://ludumdare.com/compo/ludum-dare-" + ld + "/?action=preview&uid=" + current, "ludum_dare");
+	});
+	img.addEventListener("mouseleave", function() {
+		zoom.style.display = "none";
+	});
+	// get parameters from command line
+	var qs = document.location.search.split('+').join(' ');
+	var params = {}, tokens, re = /[?&]?([^=]+)=([^&]*)/g;
+	while (tokens = re.exec(qs)) {
+		params[decodeURIComponent(tokens[1])] = decodeURIComponent(tokens[2]);
+	}
+	ld = parseInt(params["ld"]) || 32;
+	var m = {
+		path: ld + "/" + params["img"],
+		thumb_width: params["tw"],
+		thumb_height: params["th"],
+	};
+	if(!m.path || !m.thumb_width || !m.thumb_height) {
+		alert("bad parameters!");
+		return;
+	}
+	document.title = "Ludum Dare " + ld + " Mosaic - by William Edwards";
+	zoom.style.display = "none";
+	zoom_sel.style.width = m.thumb_width + "px";
+	zoom_sel.style.height = m.thumb_height + "px";
+	img.onload = function() {
+		mosaic = m;
+		zoom_img.src = img.src;
+		window.onresize();
+		if(idx) loadIdx(idx);
+	};
+	img.src = m.path + ".jpg";
+	loadJSON(m.path + ".idx.json", function(data) {
+		idx = data;
+		if(mosaic) loadIdx(idx);
+	});
+	loadJSON(ld + "/games.json", function(data) {
+		games = {}; targets = {}; jams = 0;
+		filters = { Web: {}, Windows: {}, Linux: {}, Source: {}};
+		for(var i in data) {
+			var game = data[i], uid = game[1];
+			games[uid] = game;
+			if(game[6]) jams++;
+			for(var t in game[7]) {
+				t = game[7][t].toLowerCase();
+				if(!targets[t]) targets[t] = 0;
+				targets[t]++;
+				if(t.indexOf("web") >= 0 || t.indexOf("html") >= 0 || t.indexOf("online") >= 0) filters.Web[uid] = 1;
+				if(t.indexOf("windows") >= 0) filters.Windows[uid] = 1;
+				if(t.indexOf("linux") >= 0) filters.Linux[uid] = 1;
+				if(t.indexOf("source") >= 0) filters.Source[uid] = 1;
+			}
+		}
+		console.log("loaded " + i + " LD" + ld + " games, " + jams + " are jam");
+		var filter_html = '<i>filters:</i>&nbsp;<button onclick="set_filter()">all&nbsp;(' + objLength(games) + ")</button>&nbsp;";
+		for(var f in filters)
+			filter_html += '<button onclick="set_filter(\'' + f + '\')">' + f + "&nbsp;(" + objLength(filters[f]) + ')</button>&nbsp;';
+		document.getElementById("filters").innerHTML = filter_html;
+	});
+}
+
+</script>
+<style type="text/css">
+body { background-color: black; color: white; overflow: hidden; }
+button { background-color: white; color: black; border: medium solid black; }
+button:disabled { color: gray; }
+@keyframes blink { 
+   50% { border-color: white; } 
+}
+.blink {
+	animation-name: blink ;
+	animation-duration: .2s ;
+	animation-timing-function: step-end ;
+	animation-iteration-count: infinite ;
+	animation-direction: alternate ;
+}
+#img { position: absolute; cursor: none; }
+#zoom { position: absolute; display: none; 
+	width: 176px; height: 176px;
+	border: medium solid red;
+	margin: 0px; padding: 0px;
+	pointer-events: none; overflow: hidden; }
+#zoom_sel { position: absolute;
+	width: 50px; height: 38pt; 
+	border: 5px solid red; }
+#zoom_info { position: absolute;
+	text-shadow: -1px 0 red, 0 1px red, 1px 0 red, 0 -1px red; }
+</style>
+</head>
+<body onload="init()">
+<div id="filters"></div>
+<div id="main">
+	<img id="img"/>
+	<div id="zoom">
+		<img id="zoom_img"/>
+		<div id="zoom_sel" class="blink"></div>
+		<div id="zoom_info"></div>
+	</div>
+</div>
+</body>
+</html>
