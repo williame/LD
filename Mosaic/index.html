@@ -156,20 +156,30 @@ function init() {
 	});
 }
 
+if(window.location.host == "williame.github.io") {
+	var _gaq = _gaq || [];
+	_gaq.push(['_setAccount', 'UA-27302158-1']);
+	_gaq.push(['_trackPageview']);
+
+	(function() {
+	var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+	ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+	var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+	})();
+}
+
 </script>
 <style type="text/css">
 body { background-color: black; color: white; overflow: hidden; }
 button { background-color: white; color: black; border: medium solid black; }
-button:disabled { color: gray; }
-@keyframes blink { 
-   50% { border-color: white; } 
-}
+button:disabled { background-color: yellow; color: blue; }
+@keyframes blink { 50% { border-color: white; } }
 .blink {
-	animation-name: blink ;
-	animation-duration: .2s ;
-	animation-timing-function: step-end ;
-	animation-iteration-count: infinite ;
-	animation-direction: alternate ;
+	animation-name: blink;
+	animation-duration: .2s;
+	animation-timing-function: step-end;
+	animation-iteration-count: infinite;
+	animation-direction: alternate;
 }
 #img { position: absolute; cursor: none; }
 #zoom { position: absolute; display: none; 
