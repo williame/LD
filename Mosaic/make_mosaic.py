@@ -7,7 +7,7 @@ import scrape_ld
     
 class Game:
     def __init__(self,args):
-        action, self.uid, self.thumburl, self.title, self.author, self.thumbfile, self.jam, self.targets = args
+        action, self.uid, self.thumburl, self.title, self.author, self.thumbfile, self.jam = args[:7]
         if not self.thumbfile:
             print "SKIPPING %s: NO THUMBNAIL"%self
             self.img = None

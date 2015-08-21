@@ -134,21 +134,26 @@ function init() {
 	loadJSON(ld + "/games.json", function(data) {
 		games = {}; targets = {}; jams = 0;
 		filters = { Web: {}, Windows: {}, Linux: {}, Source: {}};
+		var web_trivia = {web: 0, unity: 0, fool: 0};
 		for(var i in data) {
 			var game = data[i], uid = game[1];
 			games[uid] = game;
 			if(game[6]) jams++;
+			if(game[8] && !game[9]) filters.Web[uid] = 1;
+			if(game[8]) web_trivia.web++;
+			if(game[9]) web_trivia.unity++;
+			if(game[10]) web_trivia.fool++;
 			for(var t in game[7]) {
 				t = game[7][t].toLowerCase();
 				if(!targets[t]) targets[t] = 0;
 				targets[t]++;
-				if(t.indexOf("web") >= 0 || t.indexOf("html") >= 0 || t.indexOf("online") >= 0) filters.Web[uid] = 1;
 				if(t.indexOf("windows") >= 0) filters.Windows[uid] = 1;
 				if(t.indexOf("linux") >= 0) filters.Linux[uid] = 1;
 				if(t.indexOf("source") >= 0) filters.Source[uid] = 1;
 			}
 		}
 		console.log("loaded " + i + " LD" + ld + " games, " + jams + " are jam");
+		console.log(web_trivia)
 		var filter_html = '<i>filters:</i>&nbsp;<button onclick="set_filter()">all&nbsp;(' + objLength(games) + ")</button>&nbsp;";
 		for(var f in filters)
 			filter_html += '<button onclick="set_filter(\'' + f + '\')">' + f + "&nbsp;(" + objLength(filters[f]) + ')</button>&nbsp;';
