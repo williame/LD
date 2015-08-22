@@ -175,7 +175,21 @@ function loadFile(type,path,callback) {
 			if (doc.readyState==4 && (!doc.status || doc.status==200))
 				done(JSON.parse(doc.response));
 		};
-		doc.send();		
+		doc.send();
+	} else if(type == "text") {
+		var doc = new XMLHttpRequest();
+		doc.open("GET",path,true);
+		doc.overrideMimeType("text/plain");
+		doc.onerror = fail;
+		doc.onreadystatechange = function() {
+			if (doc.readyState==4 && (!doc.status || doc.status==200))
+				done(doc.response);
+		};
+		doc.send();
+	} else if(type == "shader") {
+		var frag, vert;
+		loadFile("text", path+".vert", function(v) { vert = v; if(frag) done(Program(vert, frag)); });
+		loadFile("text", path+".frag", function(f) { frag = f; if(vert) done(Program(vert, frag)); });
 	} else if(type == "ArrayBuffer") {
 		var doc = new XMLHttpRequest();
 		doc.open("GET",path,true);

@@ -151,11 +151,13 @@ function Program(vertexShader,fragmentShader) {
 				var value = uniforms[name];
 				switch(set) {
 				case gl.uniformMatrix4fv:
-					assert(value.length == 4*4,name,"should be 4x4",value,owner);
+					assert(value !== undefined,name," cannot be undefined");
+					assert(value.length == 4*4,name," should be 4x4 ",value,owner);
 					set.call(gl,location,false,value);
 					break;
 				case gl.uniformMatrix3fv:
-					assert(value.length == 3*3,name,"should be 3x3",value,owner);
+					assert(value !== undefined,name," cannot be undefined");
+					assert(value.length == 3*3,name," should be 3x3 ",value,owner);
 					set.call(gl,location,false,value);
 					break;
 				default:
