@@ -205,7 +205,7 @@ function init(canvas) {
 		loadFile("javascript","barebones.js/vec.js",loaded());
 		loadFile("javascript","barebones.js/gl.js",loaded());
 		loadFile("javascript","barebones.js/ui.js",loaded());
-		if(false) { //### isOnGithubPages()) {
+		if(isOnGithubPages()) {
 			var ghProject = "https://github.com/"+
 				window.location.hostname.substr(0,window.location.hostname.indexOf(".github."))+"/"+
 				window.location.pathname.split("/")[1],

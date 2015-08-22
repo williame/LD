@@ -1570,7 +1570,8 @@ function Perf() {
 		perf.slot += pts.length;
 		if(perf.slot >= perf.data.length) perf.slot = 0;
 		perf.label.text = perf.fps(3).toFixed(2)+" fps";
-		perf.setPos([canvas.width-(perf.children[0].preferredSize()[0]+10),10]);
+		var preferred_size = perf.children[0].preferredSize();
+		perf.setPos([canvas.width-(preferred_size[0]+10),canvas.height-(preferred_size[1]+10)]);
 		perf.layout();
 	};
 	perf.fps = function(secs) {
