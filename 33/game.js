@@ -5,7 +5,7 @@ function new_game() {
 	 eye = [0, 0.5, 2];
 	 centre = [0, 0, 12];
 	 up = vec3_normalise([1, 1, 0]);
-	 init_ball();
+	 init_ball_points(20);
 	 camera();
 	 //test_rays();
 }
@@ -29,24 +29,24 @@ function move() {
 	camera();
 }
 
-var ball;
+var ball_points;
 
-function init_ball() {
-	var N = 10, off = 2 / N;
+function init_ball_points(N) {
+	var off = 2 / N;
 	var inc =  Math.PI  * (3 - Math.sqrt(5));
-	ball = [];
+	ball_points = [];
 	for(var i=0; i<N; i++) {
 	    var y = i * off - 1 + (off / 2);
 	    var r = Math.sqrt(1 - y*y);
 	    var phi = i * inc;
-	    ball.push(vec3_normalise([Math.cos(phi)*r, y, Math.sin(phi)*r])); 
+	    ball_points.push(vec3_normalise([Math.cos(phi)*r, y, Math.sin(phi)*r])); 
 	}
 }
 
-function ball_search(p, thres) {
+function ball_point_search(p, thres) {
 	var sum=[0, 0, 0], count=0;
-	for(var i in ball) {
-		i = ball[i];
+	for(var i in ball_points) {
+		i = ball_points[i];
 		var dist = ray_march(p, vec3_add(p, i));
 		if(dist < thres) {
 			sum[0] += i[0] * dist;
@@ -59,7 +59,7 @@ function ball_search(p, thres) {
 }
 
 function camera() {
-	var avg = ball_search(eye, 0.3);
+	var avg = ball_point_search(eye, 0.4);
 	if(avg) {
 		var d = vec3_length(avg);
 		var n = vec3_scale(avg, 1/d);
