@@ -2,14 +2,17 @@
 var eye, centre, up, FOV = Math.PI/4, lastTick;
 
 function new_game() {
-	 eye = [0, 0.5, 0];
-	 centre = [0, 0, 10];
+	 eye = [0, 0.5, 2];
+	 centre = [0, 0, 12];
 	 up = vec3_normalise([1, 1, 0]);
+	 init_ball();
+	 camera();
+	 //test_rays();
 }
 
 function move() {
 	var now = window.now(), t = now - lastTick;
-	if(t < 0.05) return;
+	if(t < 0.01) return;
 	lastTick = now;
 	var left = keys[37]||keys[65]||keys[97]; //left arrow or A
 	var right = keys[39]||keys[68]||keys[100]; //right arrow or D
@@ -23,10 +26,51 @@ function move() {
 		centre = vec3_add(centre, d);
 		eye = vec3_add(eye, d);
 	}
-	console.log(de(eye, centre));
+	camera();
 }
 
-function de(eye, centre) { // same distance-estimator as shader, transcribed to JS
+var ball;
+
+function init_ball() {
+	var N = 10, off = 2 / N;
+	var inc =  Math.PI  * (3 - Math.sqrt(5));
+	ball = [];
+	for(var i=0; i<N; i++) {
+	    var y = i * off - 1 + (off / 2);
+	    var r = Math.sqrt(1 - y*y);
+	    var phi = i * inc;
+	    ball.push(vec3_normalise([Math.cos(phi)*r, y, Math.sin(phi)*r])); 
+	}
+}
+
+function ball_search(p, thres) {
+	var sum=[0, 0, 0], count=0;
+	for(var i in ball) {
+		i = ball[i];
+		var dist = ray_march(p, vec3_add(p, i));
+		if(dist < thres) {
+			sum[0] += i[0] * dist;
+			sum[1] += i[1] * dist;
+			sum[2] += i[2] * dist;
+			count++;
+		}
+	}
+	return count? vec3_scale(sum, 1/count): null;
+}
+
+function camera() {
+	var avg = ball_search(eye, 0.3);
+	if(avg) {
+		var d = vec3_length(avg);
+		var n = vec3_scale(avg, 1/d);
+		up = n;
+		var down = vec3_scale(up, -d + 0.1);
+		eye = vec3_add(eye, down);
+		centre = vec3_add(centre, down);
+	}
+}
+
+function ray_march(from, towards) { // same ray march as shader, transcribed to JS
 	var freqA = 0.15;
 	var freqB = 0.25;
 	var ampA = 2.4;
@@ -35,10 +79,10 @@ function de(eye, centre) { // same distance-estimator as shader, transcribed to 
 	var tri =  function(p) { return [tri1(p[0]), tri1(p[1]), tri1(p[2])]; }; // Triangle function.
 	var surfFunc = function(p) {
 		var t = tri(vec3_scale(p, 0.25));
-		var n = vec3_dot(tri(vec3_add(vec3_scale(p,0.48),[t[1],t[2],t[0]])), [0.444,0,0]);
+		var n = vec3_dot(tri(vec3_add(vec3_scale(p,0.48),[t[1],t[2],t[0]])), [0.444,0.444,0.444]);
 		p = [(p[0] + p[2]) * 0.7071, (p[2] - p[0]) * 0.7071, p[2]];
 		t = tri(vec3_scale(p,0.36));
-		return vec3_dot(tri(vec3_add(vec3_scale(p,0.72), [t[1],t[2],t[0]])), [0.222,0,0]) + n; // Range [0, 1]
+		return vec3_dot(tri(vec3_add(vec3_scale(p,0.72), [t[1],t[2],t[0]])), [0.222,0.222,0.222]) + n; // Range [0, 1]
     	};
 	var smoothMinP = function(a, b, smoothing) {
 		var h = Math.max(Math.min(1, (b-a)*0.5/smoothing + 0.5), 0);
@@ -51,18 +95,14 @@ function de(eye, centre) { // same distance-estimator as shader, transcribed to 
 	     var tun2 = vec2_sub(p, path2(p[2]));
 	     return 1.- smoothMinP(vec2_length(tun), vec2_length(tun2), 4.) + (0.5-surfFunc(p));
 	};
-	// Using the above to produce the unit ray-direction vector.
-	var forward = vec3_normalise(vec3_sub(centre, eye));
-	// rd - Ray direction.
-	var rd = vec3_normalise(forward);
-	// Standard ray marching routine 
+	var rd = vec3_normalise(vec3_sub(towards, from));
 	var t = 0.0, dt;
 	for(var i=0; i<128; i++) {
-		dt = map(vec3_add(eye, vec3_scale(rd, t)));
-		if(dt<0.005 || t>150.) break; 
+		dt = map(vec3_add(from, vec3_scale(rd, t)));
+		if(dt<0.005 || t>25.) break; 
 		t += dt*0.75;
 	}
-	return t;
+	return t + dt;
 }
 
 var tunnel_prog, tunnel_vbo, tunnel_channel_0;
@@ -83,6 +123,17 @@ function init_render() {
 
 function render() {
 	move();
+	if(test_prog && tunnel_vbo) {
+		test_prog(function(program) {
+			gl.bindBuffer(gl.ARRAY_BUFFER, tunnel_vbo);
+			gl.vertexAttribPointer(program.vertex, 3, gl.FLOAT, false, 3*4, 0);
+			gl.drawArrays(gl.TRIANGLES, 0, 6);
+			gl.bindBuffer(gl.ARRAY_BUFFER, null);				
+		}, {
+			texture: test_tex,
+		});
+		return;
+	}
 	if(tunnel_prog && tunnel_channel_0 && eye) {
 		tunnel_prog(function(program) {
 				gl.bindTexture(gl.TEXTURE_2D, tunnel_channel_0);
@@ -101,5 +152,47 @@ function render() {
 				iUp: up,
 			});
 	}
+}
+
+var test_prog, test_tex;
+
+function test_rays() { /* this verifies we have a sane ray_marching port */
+	var W=320, H=200;
+	var pixels = new Array(W*H*4), i=0;
+	var forward = vec3_normalise(vec3_sub(centre, eye));
+	var right = vec3_cross(forward, up);
+	var iResolution = [1024, 1024], iResolutionY = 1/iResolution[1];
+	var halfRes = vec2_scale(iResolution, 0.5);
+	var iScreenScale = [iResolution[0]/W, iResolution[1]/H];
+	for(var y=0; y<H; y++) {
+		for(var x=0; x<W; x++) {
+			var fragCoord = [(x + 0.5) * iScreenScale[0], (y + 0.5) * iScreenScale[1]];
+			var uv = vec2_scale(vec2_sub(fragCoord, halfRes), iResolutionY);
+			var rd = vec3_add(vec3_add(forward, vec3_scale(right, FOV*uv[0])), vec3_scale(up,FOV*uv[1]));
+			var de = ray_march(eye, vec3_add(eye, rd));
+			de *= 10; // from max ~25 to ~250
+			pixels[i++] = de;
+			pixels[i++] = de;
+			pixels[i++] = de;
+			pixels[i++] = 255;
+		}
+	}
+	pixels = new Uint8Array(pixels);
+	console.log(pixels);
+	test_tex = createTexture(test_tex, W, H, pixels);
+	test_prog = Program(
+		"precision mediump float;\n"+
+		"attribute vec3 vertex;\n"+
+		"varying vec2 texCoord;\n"+
+		"void main() {\n"+
+		"	texCoord = vec2(vertex.x==1.?1.:0., vertex.y==1.?1.:0.);\n"+
+		"	gl_Position = vec4(vertex,1.0);\n"+
+		"}\n",
+		"precision mediump float;\n"+
+		"uniform sampler2D texture;\n"+
+		"varying vec2 texCoord;\n"+
+		"void main() {\n"+
+		"	gl_FragColor = texture2D(texture, texCoord);\n"+
+		"}\n");
 }
 

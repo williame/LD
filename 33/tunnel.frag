@@ -256,11 +256,11 @@ void main() {
 	float t = 0.0, dt;
 	for(int i=0; i<128; i++){
 		dt = map(camPos + rd*t);
-		if(dt<0.005 || t>150.){ break; } 
+		if(dt<0.005 || t>25.){ break; } 
 		t += dt*0.75;
 	}
 	
-	vec3 sceneCol = vec3(0.);
+	vec3 sceneCol = vec3(1.,0.,0.);
 	
 	// The ray has effectively hit the surface, so light it up.
 	if(dt<0.005){

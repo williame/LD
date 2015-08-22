@@ -1008,6 +1008,10 @@ function vec2_add(a,b) {
 	return [a[0]+b[0],a[1]+b[1]];
 }
 
+function vec2_multiply(a,b) {
+	return [a[0]*b[0],a[1]*b[1]];
+}
+
 function vec2_normalise(v) {
 	var mag = Math.sqrt(v[0]*v[0]+v[1]*v[1]);
 	return [v[0]/mag, v[1]/mag];
