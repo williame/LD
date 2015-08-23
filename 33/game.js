@@ -1,5 +1,5 @@
 
-var FOV = Math.PI/2;
+var FOV = Math.PI/5;
 
 var from = {
 	eye: null,
@@ -14,7 +14,7 @@ var to = {
 	jaws: 0.5,
 };
 
-var game_z = 0;
+var game_v = 0, game_h = 0, game_x = 0, game_y = 0, game_z = 0, game_shudder;
 
 var ships = [];
 
@@ -22,7 +22,7 @@ var ticks_per_sec = 10;
 var step_size = Math.trunc(1000/ticks_per_sec);
 var max_step = step_size * ticks_per_sec * 0.5;
 var last_tick;
-var speed_forward = 0.02, speed_turn = 0.0001;
+var speed_forward = 0.02, speed_move = 0.01;
 
 function new_game() {
 	 from.eye = to.eye = [0, 0.5, 2];
@@ -49,6 +49,7 @@ function tick(t) {
 	from.centre = to.centre;
 	from.up = to.up;
 	from.jaws = to.jaws;
+	game_v = game_h = 0;
 	// biting?
 	if(keys[32]) {
 		if(to.jaws <= 0.5) {
@@ -63,18 +64,36 @@ function tick(t) {
 	var right = keys[39]||keys[68]||keys[100]; //right arrow or D
 	var up = keys[38]||keys[87]||keys[119]; //up arrow or W
 	var down = keys[40]||keys[83]||keys[115]; //down arrow or S
-	if(!left && !right && !up && !down) return;
-	if(up && !down) {
-		game_z += speed_forward;
+	if(left && !right) game_h = speed_move;
+	if(right && !left) game_h = -speed_move;
+	if(up && !down) game_v = speed_move;
+	if(down && !up) game_v = -speed_move;
+	if(game_v || game_h) {
+		game_x += game_h;
+		game_y += game_v;
+		game_z += speed_forward; // fixed speed forward if you're weaving
+		camera();
 	}
-	camera();
 }
 
 function camera() {
 	var p = path(game_z);
-	to.eye = [p[0], p[1], game_z];
+	for(var i=0; ; i++) {
+		to.eye = [p[0] + game_x, p[1] + game_y, game_z];
+		var search = get_ball_points(to.eye);
+		game_shudder = search[search[0]+1] < 0.3;
+		if(!game_shudder) break;
+		if(i < 3) {
+			game_x -= game_h;
+			game_y -= game_v;
+		} else { // if you hit a central column, well...
+			game_x /= 2;
+			game_y /= 2;
+			break;
+		}
+	}
 	p = path(game_z + 0.1);
-	to.centre = [p[0], p[1], game_z + 1];
+	to.centre = [p[0] + game_x, p[1] + game_y, game_z + 1];
 	to.up = [0, 1, 0];
 }
 
@@ -231,8 +250,7 @@ function render() {
 		var camMatrix = new Float32Array(createLookAt(eye,centre,up));
 		for(var ship in ships) {
 			ship = ships[ship];
-			var z = (now() - ship.start_time) / ship.speed;
-			var p = vec3_lerp(ship.path(z), ship.path(z+1/(ship.speed/ticks_per_sec)), t);
+			var z = (now() - ship.start_time) / ship.speed, p = ship.path(z);
 			var mvMatrix = mat4_multiply(mat4_rotation(Math.PI, [0, 1, 0]), mat4_scale(0.1));
 			mvMatrix = mat4_multiply(mat4_translation([p[0], p[1], z]), mvMatrix);
 			mvMatrix = mat4_multiply(camMatrix, mvMatrix);
