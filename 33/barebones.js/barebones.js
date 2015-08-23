@@ -32,6 +32,38 @@ LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
 ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. */
+
+function isOnGithubPages() {
+	return window.location.hostname.indexOf(".github.") > 0;
+}
+
+function isOnFileSystem() {
+	return "file:" === window.location.protocol;
+}
+
+function isLocalHost() {
+	return isOnFileSystem() || window.location.hostname == "localhost";
+}
+
+function getServerHost() {
+	var server = getParameterByName("server");
+	if(!server) {
+		if(isLocalHost()) // if running locally, connect locally
+			server = window.location.host;
+		else
+			server = window.location.host; //"31.192.226.244:28283"; // my private server; if you fork, you have to change this
+	}
+	return server;
+}
+
+function getParameterByName(name) {
+	name = name.replace(/[\[]/, "\\\[").replace(/[\]]/, "\\\]");
+	var	regexS = "[\\?&]" + name + "=([^&#]*)",
+		regex = new RegExp(regexS),
+		results = regex.exec(window.location.search);
+	if(results == null) return "";
+	return decodeURIComponent(results[1].replace(/\+/g, " "));
+}
  
 function arrayToString() {
 	var args = [];
