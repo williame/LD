@@ -367,6 +367,18 @@ function quat_to_mat4(q) {
 */
 }
 
+function quat_from_lookat(forward, up) {
+	// forward and up should be normalised
+	var right = vec3_cross(up, forward);
+	var w = Math.sqrt(1 + right[0] + up[1] + forward[2]) * 0.5;
+	var w4_recip = 1 / (4 * w);
+	return [
+		(up[2] - forward[1]) * w4_recip,
+		(forward[0] - right[2]) * w4_recip,
+		(right[1] - up[0]) * w4_recip,
+		w];
+}
+
 function quat_inverse(q) {
 	return [-q[0],-q[1],-q[2],q[3]];
 }

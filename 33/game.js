@@ -6,18 +6,21 @@ var from = {
 	centre: null,
 	up: null,
 	jaws: 0.5,
+	quat: [0, 0, 0, 1],
 };
 var to = {
 	eye: null,
 	centre: null,
 	up: null,
 	jaws: 0.5,
+	quat: [0, 0, 0, 1],
 };
 
 var ticks_per_sec = 10;
 var step_size = Math.trunc(1000/ticks_per_sec);
 var max_step = step_size * ticks_per_sec * 0.5;
 var last_tick;
+var speed_forward = 0.000001, speed_turn = 0.0001;
 
 function new_game() {
 	 from.eye = to.eye = [0, 0.5, 2];
@@ -43,6 +46,7 @@ function tick(t) {
 	from.centre = to.centre;
 	from.up = to.up;
 	from.jaws = to.jaws;
+	from.quat = to.quat;
 	// biting?
 	if(keys[32]) {
 		if(to.jaws <= 0.5) {
@@ -59,10 +63,10 @@ function tick(t) {
 	var down = keys[40]||keys[83]||keys[115]; //down arrow or S
 	if(!left && !right && !up && !down) return;
 	var d = vec3_sub(from.centre, from.eye);
-	if(left && !right) to.centre = vec3_add(from.eye, vec3_rotate(d, 0.0001 * t, [0, 0, 0], from.up));
-	if(right && !left) to.centre = vec3_add(from.eye, vec3_rotate(d, -0.0001 * t, [0, 0, 0], from.up));
+	if(left && !right) to.centre = vec3_add(from.eye, vec3_rotate(d, speed_turn * t, [0, 0, 0], from.up));
+	if(right && !left) to.centre = vec3_add(from.eye, vec3_rotate(d, -speed_turn * t, [0, 0, 0], from.up));
 	if(up && !down) {
-		d = vec3_scale(d, 0.000001 * t);
+		d = vec3_scale(d, speed_forward * t);
 		to.centre = vec3_add(from.centre, d);
 		to.eye = vec3_add(from.eye, d);
 	}
@@ -77,17 +81,27 @@ function camera() {
 	var search = get_ball_points(to.eye, smooth);
 	// move to be right distance above wall
 	var nearest = search[0], d = search[nearest+1] - 0.5;
-	if(float_zero(d)) return;
-	to.up = vec3_neg(ball_points[nearest]);
 	var down = vec3_scale(ball_points[nearest], d);
 	to.eye = vec3_add(to.eye, down);
+	// average all those nearby to get average up
+	search = get_ball_points(to.eye, smooth);
+	var sum = [0, 0, 0], count = 0;
+	for(var i=1; i<search.length; i++) {
+		if(search[i] < 0.7) {
+			sum = vec3_add(sum, ball_points[i-1]);
+			count++;
+		}
+	}
+	to.up = vec3_neg(vec3_normalise(vec3_scale(sum, 1/count))); // ought be already normalised, but...
 	// look another step ahead to see what the distance is there
-	var ahead = vec3_scale(vec3_normalise(vec3_sub(to.centre, to.eye)), 0.00001);
+	forward = vec3_normalise(vec3_sub(to.centre, to.eye));
+	var ahead = vec3_scale(forward, speed_forward);
 	search = get_ball_points(ahead, smooth);
 	nearest = search[0]; d = search[nearest+1] - 0.5;
 	if(float_zero(d)) return;
 	down = vec3_scale(ball_points[nearest], d);
 	to.centre = vec3_add(to.centre, down);
+	to.quat = quat_from_lookat(forward, to.up);
 }
 
 var ball_points;
@@ -174,7 +188,7 @@ function render() {
 		var t = update() / step_size;
 		var eye = vec3_lerp(from.eye, to.eye, t);
 		var centre = vec3_lerp(from.centre, to.centre, t);
-		var up = vec3_normalise(vec3_lerp(from.up, to.up, t)); // use quat
+		var up = vec3_normalise(vec3_lerp(from.up, to.up, t)); //TODO quats
 		var jaws = lerp(from.jaws, to.jaws, t);
 	}
 	if(test_prog && tunnel_vbo) {
@@ -205,6 +219,7 @@ function render() {
 				iCentre: centre,
 				iUp: up,
 				iJaws: jaws,
+				iTunnelLength: 100,
 			});
 	}
 }

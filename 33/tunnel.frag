@@ -5,6 +5,7 @@ uniform float iFOV, iScale0;
 uniform sampler2D iChannel0;
 uniform vec3 iEye, iCentre, iUp;
 uniform float iJaws;
+uniform float iTunnelLength;
 
 /*
     Subterranean Cavern
@@ -241,13 +242,17 @@ void main() {
 	vec2 fragCoord = gl_FragCoord.xy * iScreenScale;
 	vec2 screenCentre = iResolution.xy*0.5;
 	vec2 uv = (fragCoord - screenCentre)/min(iResolution.x, iResolution.y);
-	vec3 lookAt = iCentre, camPos = iEye, up = iUp;
-	vec3 forward = normalize(lookAt-camPos);
-	
+
 	// monster mouth jaws aperture
 	if(draw_mouth(uv)) {
 		return;
 	}
+
+	vec3 lookAt = iCentre; //vec3(0.0, 0.0, iCentre.z);
+	vec3 camPos = iEye; //lookAt + vec3(0.0, 0.0, -0.1);
+	vec3 up = iUp;
+	vec3 forward = normalize(lookAt-camPos);
+	
 	
     // Light positioning. One is a little behind the camera, and the other is further down the tunnel.
  	vec3 light_pos = camPos + forward*-0.1;// Put it a bit behind of the camera.
@@ -256,11 +261,11 @@ void main() {
 	// Using the Z-value to perturb the XY-plane.
 	// Sending the camera, "look at," and two light vectors down the tunnel. The "path" function is 
 	// synchronized with the distance function. Change to "path2" to traverse the other tunnel.
-/*	lookAt.xy += path(lookAt.z);
+	lookAt.xy += path(lookAt.z);
 	camPos.xy += path(camPos.z);
 	light_pos.xy += path(light_pos.z);
 	light_pos2.xy += path(light_pos2.z);
-*/
+
     // Using the above to produce the unit ray-direction vector.
     vec3 right = cross(forward, up);
 //    vec3 right = normalize(vec3(forward.z, 0, -forward.x )); 
@@ -292,6 +297,10 @@ void main() {
     	
     	// Surface position and surface normal.
 	    vec3 sp = t * rd+camPos;
+	    if(sp.z > iTunnelLength) {
+	    	    gl_FragColor = vec4(1., 0., 0., 1.);
+	    	    return;
+	    }	    
 	    vec3 sn = getNormal(sp);
         
     	
