@@ -120,7 +120,10 @@ G3D.prototype = {
 		if(this.ready && this.readyCallbacks)
 			setTimeout(done,0);
 	},
-	draw: function(uniforms,t,untextured,op) {
+	draw: function(uniforms,t,untextured,op) { // FIXME
+		this.drawCustom(uniforms, programs.standard, untextured, op);
+	},
+	drawCustom: function(uniforms,prog,t,untextured,op) {
 		if(!this.ready) return;
 		op = op || gl.TRIANGLES;
 		var	wasCulled = gl.getParameter(gl.CULL_FACE),
@@ -129,9 +132,9 @@ G3D.prototype = {
 		gl.frontFace(gl.CCW);
 		gl.cullFace(gl.BACK);
 		if(this.meshesSingle.length)
-			programs.standard(this._drawSingle,uniforms,this,untextured,op);
+			prog(this._drawSingle,uniforms,this,untextured,op);
 		if(this.meshesLerp.length)
-			programs.standardLerp(this._drawLerp,uniforms,this,t||0,untextured,op);
+			prog(this._drawLerp,uniforms,this,t||0,untextured,op);
 		if(wasCulled) gl.enable(gl.CULL_FACE); else gl.disable(gl.CULL_FACE);
 		gl.frontFace(wasFace);
 		gl.cullFace(wasMode);

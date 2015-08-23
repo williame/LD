@@ -2,10 +2,12 @@ precision mediump float;
 uniform vec2 iResolution;
 uniform vec2 iScreenScale;
 uniform float iFOV, iScale0;
-uniform sampler2D iChannel0;
 uniform vec3 iEye, iCentre, iUp;
 uniform float iJaws;
 uniform float iTunnelLength;
+varying vec2 texel;
+varying lowp vec3 lighting;
+uniform sampler2D texture;
 
 /*
     Subterranean Cavern
@@ -273,116 +275,25 @@ void main() {
 
     // rd - Ray direction.
     vec3 rd = normalize(forward + iFOV*uv.x*right + iFOV*uv.y*up);
+    
+    	float frag_depth = (gl_FragCoord.z / gl_FragCoord.w);
 		
     // Standard ray marching routine. I find that some system setups don't like anything other than
     // a "break" statement (by itself) to exit. 
 	float t = 0.0, dt;
 	for(int i=0; i<128; i++){
 		dt = map(camPos + rd*t);
-		if(dt<0.005 || t>25.){ break; } 
+		if(dt<0.005 || t>25. && t<frag_depth){ break; } 
 		t += dt*0.75;
 	}
-	
-	vec3 sceneCol = vec3(0.);
-	
-	// The ray has effectively hit the surface, so light it up.
-	if(dt<0.005){
-	
-	    // The ray marching loop (above) exits when "dt" is less than a certain threshold, which in this 
-        // case, is hardcoded to "0.005." However, the distance is still "dt" from the surface? By my logic, 
-	    // adding the extra "dt" after breaking would gain a little more accuracy and effectively reduce 
-	    // surface popping? Would that be correct? I tend to do this, but could be completely wrong, so if 
-	    // someone could set me straight, it'd be appreciated. 
-	    t += dt;
-    	
-    	// Surface position and surface normal.
-	    vec3 sp = t * rd+camPos;
-	    if(sp.z > iTunnelLength) {
-	    	    gl_FragColor = vec4(1., 0., 0., 1.);
-	    	    return;
-	    }	    
-	    vec3 sn = getNormal(sp);
-        
-    	
-    	// Texture-based bump mapping. Comment this line out to spoil the illusion.
-	    sn = doBumpMap(iChannel0, sp*iScale0, sn, 0.05);
-	    
-	    // Ambient occlusion.
-	    float ao = calculateAO(sp, sn);
-    	
-    	// Light direction vectors.
-	    vec3 ld = light_pos-sp;
-	    vec3 ld2 = light_pos2-sp;
 
-        // Distance from respective lights to the surface point.
-	    float distlpsp = max(length(ld), 0.001);
-	    float distlpsp2 = max(length(ld2), 0.001);
-    	
-    	// Normalize the light direction vectors.
-	    ld /= distlpsp;
-	    ld2 /= distlpsp2;
-	    
-	    // Light attenuation, based on the distances above.
-	    float atten = min(1./(distlpsp) + 1./(distlpsp2), 1.);
-    	
-    	// Ambient light.
-	    float ambience = 0.05;
-    	
-    	// Diffuse lighting.
-	    float diff = max( dot(sn, ld), 0.0);
-	    float diff2 = max( dot(sn, ld2), 0.0);
-    	
-    	// Specular lighting.
-	    float spec = pow(max( dot( reflect(-ld, sn), -rd ), 0.0 ), 8.);
-	    float spec2 = pow(max( dot( reflect(-ld2, sn), -rd ), 0.0 ), 8.);
-    	
-    	// Curvature.
-	    float crv = clamp(curve(sp, 0.125)*0.5+0.5, .0, 1.);
-	    
-	    // Fresnel term. Good for giving a surface a bit of a reflective glow.
-        float fre = pow( clamp(dot(sn, rd) + 1., .0, 1.), 1.);
-        
-        // Obtaining the texel color. 
-	    vec3 texCol = tex3D(iChannel0, sp*iScale0, sn); // Sandstone.
-       
-        // Shadertoy doesn't appear to have anisotropic filtering turned on... although,
-        // I could be wrong. Texture-bumped objects don't appear to look as crisp. Anyway, 
-        // this is just a very lame, and not particularly well though out, way to sparkle 
-        // up the blurry bits. It's not really that necessary.
-        //vec3 aniso = (0.5-hash33(sp))*fre*0.35;
-	    //texCol = clamp(texCol + aniso, 0., 1.);
-    	
-    	// Darkening the crevices. Otherwise known as cheap, scientifically-incorrect shadowing.	
-	    float shading =  crv*0.5+0.5; 
-    	
-        // Shadows - They didn't add enough aesthetic value to justify the GPU drain, so they
-        // didn't make the cut. There are two lights, so technically there should be two
-        // of these but one is far enough away not to worry about.
-        //shading *= softShadow(sp, ld, 0.005*4., distlpsp, 16.);
-    	
-    	// Combing the above terms to produce the final color. It was based more on acheiving a
-        // certain aesthetic than science.
-        sceneCol = texCol*((diff+diff2)*vec3(1.0, 0.96, 0.92) + ambience + (spec+spec2) + fre*fre*texCol*2.);
-        // Other combinations:
-        //
-        // Cold.
-        //sceneCol = getGrey(texCol)*((diff+diff2)*0.75 + ambience*0.25) + (spec+spec2)*texCol*2. + fre*crv*texCol.zyx;
-        // Damp.
-        //sceneCol = texCol*((diff+diff2)*vec3(1.0, 0.95, 0.9) + ambience) + (spec+spec2) + fre*fre*texCol.yxz*texCol.yxz;
-	    
-        // Shading.
-        sceneCol *= atten*shading*ao;
-	   
-	
+	if(dt<0.005 && t+dt < frag_depth) {
+		discard;
 	}
 	
-	// make rendering fairly roundish
-	float mouth_d = length(uv);
-	if(mouth_d > 0.5) {
-		sceneCol -= (mouth_d - 0.5) * 4.;
-	}
-	
-	gl_FragColor = vec4(clamp(sceneCol, 0., 1.), 1.0);
+	vec4 fragColour = texture2D(texture,texel);
+	fragColour.rgb *= lighting;
+	gl_FragColor = fragColour;
 	
 }
 

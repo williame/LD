@@ -46,7 +46,8 @@ function game() {
 		new_game();
 	});
 	loadFile("javascript","game.js",loader());
-	loadFile("audio", "data/munch1.ogg", loader());
+	loadFile("javascript","barebones.js/g3d.js",loader());
+	loadFile("audio","data/munch1.ogg",loader());
 	if(!isOnFileSystem())
 		document.getElementById("soundtrack_control").play();
 }

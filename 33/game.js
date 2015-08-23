@@ -16,6 +16,8 @@ var to = {
 	quat: [0, 0, 0, 1],
 };
 
+var ships = [];
+
 var ticks_per_sec = 10;
 var step_size = Math.trunc(1000/ticks_per_sec);
 var max_step = step_size * ticks_per_sec * 0.5;
@@ -28,6 +30,7 @@ function new_game() {
 	 from.up = to.up = vec3_normalise([1, 1, 0]);
 	 init_ball_points(20);
 	 camera();
+	 //test_rays();
 	 last_tick = now();
 }
 
@@ -132,11 +135,13 @@ function get_ball_points(p, smooth) {
 	return ret;
 }
 
+var freqA = 0.15, freqB = 0.25, ampA = 2.4, ampB = 1.7;
+
+function path(z) { return [ampA*Math.sin(z * freqA), ampB*Math.cos(z * freqB)]; }
+
+function path2(z) { return [ampB*Math.sin(z * freqB*1.5), ampA*Math.cos(z * freqA*1.3)]; }
+
 function ray_march(from, towards, smooth) { // same ray march as shader, transcribed to JS
-	var freqA = 0.15;
-	var freqB = 0.25;
-	var ampA = 2.4;
-	var ampB = 1.7;
 	var tri1 = function(x) { return Math.abs(x-Math.floor(x)-.5); };
 	var tri =  function(p) { return [tri1(p[0]), tri1(p[1]), tri1(p[2])]; }; // Triangle function.
 	var surfFunc = function(p) {
@@ -150,12 +155,10 @@ function ray_march(from, towards, smooth) { // same ray march as shader, transcr
 		var h = Math.max(Math.min(1, (b-a)*0.5/smoothing + 0.5), 0);
 		return lerp(b, a, h) - smoothing*h*(1.0-h);
 	};
-	var path = function(z) { return [ampA*Math.sin(z * freqA), ampB*Math.cos(z * freqB)]; };
-	var path2 = function(z) { return [ampB*Math.sin(z * freqB*1.5), ampA*Math.cos(z * freqA*1.3)]; };
 	var map = function(p) {
 	     var tun = vec2_sub(p, path(p[2]));
 	     var tun2 = vec2_sub(p, path2(p[2]));
-	     return 1.- smoothMinP(vec2_length(tun), vec2_length(tun2), 4.) + (smooth? 0.5-surfFunc(p): 0);
+	     return 1.- smoothMinP(vec2_length(tun), vec2_length(tun2), 4.) + (smooth? 0: 0.5-surfFunc(p));
 	};
 	var rd = vec3_normalise(vec3_sub(towards, from));
 	var t = 0.0, dt;
@@ -169,7 +172,10 @@ function ray_march(from, towards, smooth) { // same ray march as shader, transcr
 
 var tunnel_prog, tunnel_vbo, tunnel_channel_0;
 
+var ship_prog, ship_models = [];
+
 function init_render() {
+	// load tunnel
 	loadFile("shader", "tunnel", function(prog) { tunnel_prog = prog; });
 	loadFile("image", "data/stone2.jpg", function(tex) {
 		tunnel_channel_0 = tex;
@@ -181,6 +187,21 @@ function init_render() {
 	gl.bindBuffer(gl.ARRAY_BUFFER, tunnel_vbo);
 	gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1,1, 1,1,1, -1,1,1, -1,-1,1, 1,-1,1, 1,1,1]), gl.STATIC_DRAW);
 	gl.bindBuffer(gl.ARRAY_BUFFER, null);
+	// load ships
+	loadFile("shader","model", function(prog) { ship_prog = prog; });
+	var model_loaded = function(model) { ship_models.push(model); new_ship(model); };
+	for(var i=1; i<=8; i++)
+		new G3D("data/fighter"+i+".g3d", model_loaded);
+}
+
+function new_ship(model, path, speed) {
+	model = model || choose(ship_models);
+	ships.push({
+		model: model,
+		start_time: now(),
+		path: path || choose([window.path, path2]),
+		speed: speed || choose([300, 1000, 1500]), // small is faster
+	});
 }
 
 function render() {
@@ -190,37 +211,69 @@ function render() {
 		var centre = vec3_lerp(from.centre, to.centre, t);
 		var up = vec3_normalise(vec3_lerp(from.up, to.up, t)); //TODO quats
 		var jaws = lerp(from.jaws, to.jaws, t);
+		var uniforms = {
+			iResolution: [canvas.offsetWidth, canvas.offsetHeight], // based on window not canvas res
+			iScreenScale: [canvas.offsetWidth/canvas.width, canvas.offsetHeight/canvas.height],
+			iChannel0: tunnel_channel_0,
+			iScale0: 0.7,
+			iFOV: FOV,
+			iEye: eye,
+			iCentre: centre,
+			iUp: up,
+			iJaws: jaws,
+			iTunnelLength: 100,
+		};
 	}
 	if(test_prog && tunnel_vbo) {
 		test_prog(function(program) {
+			gl.depthMask(false);
 			gl.bindBuffer(gl.ARRAY_BUFFER, tunnel_vbo);
 			gl.vertexAttribPointer(program.vertex, 3, gl.FLOAT, false, 3*4, 0);
 			gl.drawArrays(gl.TRIANGLES, 0, 6);
-			gl.bindBuffer(gl.ARRAY_BUFFER, null);				
+			gl.bindBuffer(gl.ARRAY_BUFFER, null);	
+			gl.depthMask(true);			
 		}, {
 			texture: test_tex,
 		});
-		return;
 	}
-	if(tunnel_prog && tunnel_channel_0 && eye) {
+	if(!test_prog && tunnel_prog && tunnel_channel_0 && eye) {
 		tunnel_prog(function(program) {
+				gl.depthMask(false);
 				gl.bindTexture(gl.TEXTURE_2D, tunnel_channel_0);
 				gl.bindBuffer(gl.ARRAY_BUFFER, tunnel_vbo);
 				gl.vertexAttribPointer(program.vertex, 3, gl.FLOAT, false, 3*4, 0);
 				gl.drawArrays(gl.TRIANGLES, 0, 6);
-				gl.bindBuffer(gl.ARRAY_BUFFER, null);				
-			}, {
-				iResolution: [canvas.offsetWidth, canvas.offsetHeight], // based on window not canvas res
-				iScreenScale: [canvas.offsetWidth/canvas.width, canvas.offsetHeight/canvas.height],
-				iChannel0: tunnel_channel_0,
-				iScale0: 0.7,
-				iFOV: FOV,
-				iEye: eye,
-				iCentre: centre,
-				iUp: up,
-				iJaws: jaws,
-				iTunnelLength: 100,
-			});
+				gl.bindBuffer(gl.ARRAY_BUFFER, null);	
+				gl.depthMask(true);
+			}, uniforms);
+	}
+	if(ship_prog && ships.length && eye) {
+		var pMatrix = new Float32Array(createPerspective(RAD2DEG*FOV,canvas.offsetWidth / canvas.offsetHeight,0.01,100));
+		var camMatrix = new Float32Array(createLookAt(eye,centre,up));
+		var mvModel = mat4_multiply(mat4_rotation(Math.PI, [0, 1, 0]), mat4_scale(0.5));
+		for(var ship in ships) {
+			ship = ships[ship];
+			var t = (now() - ship.start_time) / ship.speed, p = ship.path(t);
+			var mvMatrix = mat4_multiply(mat4_translation([p[0], p[1], t]),mvModel);
+			mvMatrix = mat4_multiply(camMatrix, mvMatrix);
+			var nMatrix = mat4_mat3(mat4_transpose(mat4_inverse(mvMatrix)));
+			ship.model.drawCustom({
+					__proto__: uniforms,
+					pMatrix: pMatrix,
+					mvMatrix: mvMatrix,
+					nMatrix: nMatrix,
+					colour: OPAQUE,
+					fogColour: [0.2,0.2,0.2,1.0],
+					fogDensity: 0.0,
+					lightColour: [1,1,1],
+					lightDir: [0,1,0],
+					lightPos: [-0.5,1,1],
+					ambientLight: [0.5,0.5,0.5],
+					diffuseLight: [0.6,0.6,0.6],
+					specularLight: [0,0,0.2],
+				}, ship_prog);
+		}
+
 	}
 }
 
