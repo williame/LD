@@ -19,7 +19,7 @@ function game() {
 	var loader = Waiter(function() {
 		window.perf = new Perf(128);
 		game.menu = new UIWindow(false,new UIPanel([
-				new UILabel("perf"),
+				new UILabel("debug"),
 				new UICheckbox("show fps",function() { window.perf.window().setVisible(this.isChecked()); }),
 				new UICheckbox("640x480", function() {
 					if(this.isChecked()) {
@@ -35,7 +35,7 @@ function game() {
 						soundtrack.play();
 					else
 						soundtrack.pause();
-				},null,true),
+				},null,!isOnFileSystem()),
 				new UIButton("pause",function() { paused = !paused; }),
 			],UILayoutRows));
 		game.menu.ctrl.allowClickThru = false;
@@ -46,6 +46,9 @@ function game() {
 		new_game();
 	});
 	loadFile("javascript","game.js",loader());
+	loadFile("audio", "data/munch1.ogg", loader());
+	if(!isOnFileSystem())
+		document.getElementById("soundtrack_control").play();
 }
 
 if(!isOnFileSystem() && !isLocalHost()) {
@@ -71,7 +74,7 @@ if(!isOnFileSystem() && !isLocalHost()) {
 <canvas id="main-canvas" moz-opaque>
 <div class="error">Sorry, you don't have webGL enabled :(</div>
 </canvas>
-<audio autoplay loop="loop" id="soundtrack_control" style="position:fixed;bottom:0px;left:0px;z-order:100000;">
+<audio loop="loop" id="soundtrack_control" style="position:fixed;bottom:0px;left:0px;z-order:100000;">
 	<source src="data/Right Behind You.mp3" type="audio/mpeg" />
 </audio>
 </body>

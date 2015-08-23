@@ -45,6 +45,9 @@ function tick(t) {
 	from.jaws = to.jaws;
 	// biting?
 	if(keys[32]) {
+		if(to.jaws <= 0.5) {
+			playSound(getFile("audio", "data/munch1.ogg"));
+		}
 		to.jaws = Math.min(7, to.jaws * 1.5);
 	} else {
 		to.jaws = Math.max(0.5, to.jaws * 0.9);
