@@ -1,32 +1,71 @@
 
-var eye, centre, up, FOV = Math.PI/4, lastTick;
+var FOV = Math.PI/4;
+
+var from = {
+	eye: null,
+	centre: null,
+	up: null,
+};
+var to = {
+	eye: null,
+	centre: null,
+	up: null,
+};
+
+var ticks_per_sec = 10;
+var step_size = Math.trunc(1000/ticks_per_sec);
+var max_step = step_size * ticks_per_sec * 0.5;
+var last_tick;
 
 function new_game() {
-	 eye = [0, 0.5, 2];
-	 centre = [0, 0, 12];
-	 up = vec3_normalise([1, 1, 0]);
+	 from.eye = to.eye = [0, 0.5, 2];
+	 from.centre = to.centre = [0, 0, 12];
+	 from.up = to.up = vec3_normalise([1, 1, 0]);
 	 init_ball_points(20);
 	 camera();
-	 //test_rays();
+	 last_tick = now();
 }
 
-function move() {
-	var now = window.now(), t = now - lastTick;
-	if(t < 0.01) return;
-	lastTick = now;
+function update() {
+	var now = window.now(), t = Math.min(max_step, now - last_tick);
+	for(var i=0; i<t; i+=step_size) {
+		tick(step_size);
+	}
+	t = now % step_size;
+	last_tick = now - t;
+	return t;
+}
+
+function tick(t) {
+	from.eye = to.eye;
+	from.centre = to.centre;
+	from.up = to.up;
+	// keys?
 	var left = keys[37]||keys[65]||keys[97]; //left arrow or A
 	var right = keys[39]||keys[68]||keys[100]; //right arrow or D
 	var forward = keys[38]||keys[87]||keys[119]; //up arrow or W
 	if(!left && !right && !forward) return;
-	var d = vec3_sub(centre, eye);
-	if(left && !right) up = vec3_rotate(up, 0.001 * t, [0, 0, 0], d);
-	if(right && !left) up = vec3_rotate(up, -0.001 * t, [0, 0, 0], d);
+	var d = vec3_sub(from.centre, from.eye);
+	if(left && !right) to.up = vec3_rotate(from.up, 0.0001 * t, [0, 0, 0], d);
+	if(right && !left) to.up = vec3_rotate(from.up, -0.0001 * t, [0, 0, 0], d);
 	if(forward) {
-		d = vec3_scale(d, 0.0001 * t);
-		centre = vec3_add(centre, d);
-		eye = vec3_add(eye, d);
+		d = vec3_scale(d, 0.00001 * t);
+		to.centre = vec3_add(from.centre, d);
+		to.eye = vec3_add(from.eye, d);
 	}
 	camera();
+}
+
+function camera() {
+	var avg = ball_point_search(to.eye, 0.4);
+	if(avg) {
+		var d = vec3_length(avg);
+		var n = vec3_scale(avg, 1/d);
+		to.up = n;
+		var down = vec3_scale(to.up, -d + 0.1);
+		to.eye = vec3_add(to.eye, down);
+		to.centre = vec3_add(to.centre, down);
+	}
 }
 
 var ball_points;
@@ -56,18 +95,6 @@ function ball_point_search(p, thres) {
 		}
 	}
 	return count? vec3_scale(sum, 1/count): null;
-}
-
-function camera() {
-	var avg = ball_point_search(eye, 0.4);
-	if(avg) {
-		var d = vec3_length(avg);
-		var n = vec3_scale(avg, 1/d);
-		up = n;
-		var down = vec3_scale(up, -d + 0.1);
-		eye = vec3_add(eye, down);
-		centre = vec3_add(centre, down);
-	}
 }
 
 function ray_march(from, towards) { // same ray march as shader, transcribed to JS
@@ -122,7 +149,12 @@ function init_render() {
 }
 
 function render() {
-	move();
+	if(to.eye) { // game inited
+		var t = update() / step_size;
+		var eye = vec3_lerp(from.eye, to.eye, t);
+		var centre = vec3_lerp(from.centre, to.centre, t);
+		var up = vec3_lerp(from.up, to.up, t); // use quat
+	}
 	if(test_prog && tunnel_vbo) {
 		test_prog(function(program) {
 			gl.bindBuffer(gl.ARRAY_BUFFER, tunnel_vbo);
@@ -159,8 +191,8 @@ var test_prog, test_tex;
 function test_rays() { /* this verifies we have a sane ray_marching port */
 	var W=320, H=200;
 	var pixels = new Array(W*H*4), i=0;
-	var forward = vec3_normalise(vec3_sub(centre, eye));
-	var right = vec3_cross(forward, up);
+	var forward = vec3_normalise(vec3_sub(from.centre, from.eye));
+	var right = vec3_cross(forward, from.up);
 	var iResolution = [1024, 1024], iResolutionY = 1/iResolution[1];
 	var halfRes = vec2_scale(iResolution, 0.5);
 	var iScreenScale = [iResolution[0]/W, iResolution[1]/H];
@@ -168,8 +200,8 @@ function test_rays() { /* this verifies we have a sane ray_marching port */
 		for(var x=0; x<W; x++) {
 			var fragCoord = [(x + 0.5) * iScreenScale[0], (y + 0.5) * iScreenScale[1]];
 			var uv = vec2_scale(vec2_sub(fragCoord, halfRes), iResolutionY);
-			var rd = vec3_add(vec3_add(forward, vec3_scale(right, FOV*uv[0])), vec3_scale(up,FOV*uv[1]));
-			var de = ray_march(eye, vec3_add(eye, rd));
+			var rd = vec3_add(vec3_add(forward, vec3_scale(right, FOV*uv[0])), vec3_scale(from.up,FOV*uv[1]));
+			var de = ray_march(from.eye, vec3_add(from.eye, rd));
 			de *= 10; // from max ~25 to ~250
 			pixels[i++] = de;
 			pixels[i++] = de;
