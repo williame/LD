@@ -652,6 +652,8 @@ var UI = {
 					UI.defaults.lineHeight = UI.fonts[name].lineHeight;
 				if(callback)
 					callback(UI.fonts[name]);
+				for(var i in UI.windows)
+					UI.windows[i].layout();
 				window.setTimeout(Callback(window,window.onresize),0);
 			}
 		};

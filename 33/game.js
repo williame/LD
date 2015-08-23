@@ -1,15 +1,17 @@
 
-var FOV = Math.PI/4;
+var FOV = Math.PI/2;
 
 var from = {
 	eye: null,
 	centre: null,
 	up: null,
+	jaws: 0.5,
 };
 var to = {
 	eye: null,
 	centre: null,
 	up: null,
+	jaws: 0.5,
 };
 
 var ticks_per_sec = 10;
@@ -40,14 +42,21 @@ function tick(t) {
 	from.eye = to.eye;
 	from.centre = to.centre;
 	from.up = to.up;
-	// keys?
+	from.jaws = to.jaws;
+	// biting?
+	if(keys[32]) {
+		to.jaws = Math.min(7, to.jaws * 1.5);
+	} else {
+		to.jaws = Math.max(0.5, to.jaws * 0.9);
+	}
+	// move keys?
 	var left = keys[37]||keys[65]||keys[97]; //left arrow or A
 	var right = keys[39]||keys[68]||keys[100]; //right arrow or D
 	var forward = keys[38]||keys[87]||keys[119]; //up arrow or W
 	if(!left && !right && !forward) return;
 	var d = vec3_sub(from.centre, from.eye);
-	if(left && !right) to.up = vec3_rotate(from.up, 0.0001 * t, [0, 0, 0], d);
-	if(right && !left) to.up = vec3_rotate(from.up, -0.0001 * t, [0, 0, 0], d);
+//	if(left && !right) to.up = vec3_rotate(from.up, 0.0001 * t, [0, 0, 0], d);
+//	if(right && !left) to.up = vec3_rotate(from.up, -0.0001 * t, [0, 0, 0], d);
 	if(forward) {
 		d = vec3_scale(d, 0.00001 * t);
 		to.centre = vec3_add(from.centre, d);
@@ -66,8 +75,8 @@ function camera() {
 	to.centre = vec3_add(to.centre, down);
 	// and get normal for wall
 	search = get_ball_points(to.eye, true);
-	if(Math.abs(search[search[0]+1] - 0.5) < 0.01)
-		console.log("bad dist", search);
+//	if(Math.abs(search[search[0]+1] - 0.5) < 0.01) // happens all the time
+//		console.log("bad dist", search);
 	var sum = [0, 0, 0], count = 0;
 	for(var i=1; i<search.length; i++) {
 		if(search[i] < 0.6) {
@@ -146,7 +155,7 @@ var tunnel_prog, tunnel_vbo, tunnel_channel_0;
 
 function init_render() {
 	loadFile("shader", "tunnel", function(prog) { tunnel_prog = prog; });
-	loadFile("image", "data/stone.jpg", function(tex) {
+	loadFile("image", "data/stone2.jpg", function(tex) {
 		tunnel_channel_0 = tex;
 		gl.bindTexture(gl.TEXTURE_2D, tunnel_channel_0);
 		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
@@ -164,6 +173,7 @@ function render() {
 		var eye = vec3_lerp(from.eye, to.eye, t);
 		var centre = vec3_lerp(from.centre, to.centre, t);
 		var up = vec3_lerp(from.up, to.up, t); // use quat
+		var jaws = lerp(from.jaws, to.jaws, t);
 	}
 	if(test_prog && tunnel_vbo) {
 		test_prog(function(program) {
@@ -192,6 +202,7 @@ function render() {
 				iEye: eye,
 				iCentre: centre,
 				iUp: up,
+				iJaws: jaws,
 			});
 	}
 }

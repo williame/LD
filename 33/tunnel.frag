@@ -4,6 +4,7 @@ uniform vec2 iScreenScale;
 uniform float iFOV, iScale0;
 uniform sampler2D iChannel0;
 uniform vec3 iEye, iCentre, iUp;
+uniform float iJaws;
 
 /*
     Subterranean Cavern
@@ -222,17 +223,35 @@ float curve(in vec3 p, in float w){
     return 0.125/(w*w) *(t1 + t2 + t3 + t4 - 4.*map(p));
 }
 
+bool draw_mouth(in vec2 uv) {
+	const float teeth_width = 0.1;
+	float mouth_v = abs(uv.y)*iJaws, mouth_h = 0.5 - sin(uv.x*uv.x);
+	if(mouth_v <= mouth_h) return false;
+	float teeth = mod(uv.x, teeth_width);
+	if(teeth > teeth_width * 0.5) {
+		teeth = teeth_width - teeth;
+	}
+	teeth *= 10.0*length(vec2(mouth_v, mouth_h));
+	return mouth_v > mouth_h + teeth;
+}
+
 void main() {
 	
 	// Screen coordinates.
 	vec2 fragCoord = gl_FragCoord.xy * iScreenScale;
-	vec2 uv = (fragCoord - iResolution.xy*0.5)/iResolution.y;
-	
+	vec2 screenCentre = iResolution.xy*0.5;
+	vec2 uv = (fragCoord - screenCentre)/min(iResolution.x, iResolution.y);
 	vec3 lookAt = iCentre, camPos = iEye, up = iUp;
+	vec3 forward = normalize(lookAt-camPos);
+	
+	// monster mouth jaws aperture
+	if(draw_mouth(uv)) {
+		return;
+	}
 	
     // Light positioning. One is a little behind the camera, and the other is further down the tunnel.
- 	vec3 light_pos = camPos + vec3(0.0, 0.125, -0.125);// Put it a bit behind of the camera.
-	vec3 light_pos2 = camPos + vec3(0.0, 0.0, 3.0);// Put it a bit in front of the camera.
+ 	vec3 light_pos = camPos + forward*-0.1;// Put it a bit behind of the camera.
+	vec3 light_pos2 = camPos + forward;// Put it a bit in front of the camera.
 
 	// Using the Z-value to perturb the XY-plane.
 	// Sending the camera, "look at," and two light vectors down the tunnel. The "path" function is 
@@ -243,7 +262,6 @@ void main() {
 	light_pos2.xy += path(light_pos2.z);
 */
     // Using the above to produce the unit ray-direction vector.
-    vec3 forward = normalize(lookAt-camPos);
     vec3 right = cross(forward, up);
 //    vec3 right = normalize(vec3(forward.z, 0, -forward.x )); 
 //    vec3 up = cross(forward, right);
@@ -299,7 +317,7 @@ void main() {
 	    float atten = min(1./(distlpsp) + 1./(distlpsp2), 1.);
     	
     	// Ambient light.
-	    float ambience = 0.25;
+	    float ambience = 0.05;
     	
     	// Diffuse lighting.
 	    float diff = max( dot(sn, ld), 0.0);
@@ -347,6 +365,12 @@ void main() {
         sceneCol *= atten*shading*ao;
 	   
 	
+	}
+	
+	// make rendering fairly roundish
+	float mouth_d = length(uv);
+	if(mouth_d > 0.5) {
+		sceneCol -= (mouth_d - 0.5) * 4.;
 	}
 	
 	gl_FragColor = vec4(clamp(sceneCol, 0., 1.), 1.0);
