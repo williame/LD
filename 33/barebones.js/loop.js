@@ -223,12 +223,13 @@ function drawLogo(ctx,alpha) {
 	ctx.fillRect([0,0,0,alpha],0,0,canvas.width,canvas.height);
 	var logo = window.logo_filename? getFile("image",logo_filename): null;
 	if(logo) {
-		var	x = (canvas.width-logo.width)/2,
-			y = (canvas.height-logo.height)/2;
+		var logo_sizer = canvas; // or logo
+		var	x = (canvas.width-logo_sizer.width)/2,
+			y = (canvas.height-logo_sizer.height)/2;
 		ctx.drawRect(logo,[1,1,1,alpha],
 			Math.max(x,0),Math.max(y,0),
-			Math.min(x+logo.width,canvas.width),
-			Math.min(y+logo.height,canvas.height),
+			Math.min(x+logo_sizer.width,canvas.width),
+			Math.min(y+logo_sizer.height,canvas.height),
 			0,0,1,1);
 	}
 }

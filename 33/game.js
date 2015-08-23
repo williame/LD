@@ -86,9 +86,9 @@ function camera() {
 		if(i < 3) {
 			game_x -= game_h;
 			game_y -= game_v;
-		} else { // if you hit a central column, well...
-			game_x /= 2;
-			game_y /= 2;
+		} else { // if you hit a central column, well... we drag you back to main path side
+			game_x *= 0.9;
+			game_y *= 0.9;
 			break;
 		}
 	}
@@ -165,6 +165,21 @@ var tunnel_prog, tunnel_vbo, tunnel_channel_0;
 var night_sky;
 
 var ship_prog, ship_models = [];
+
+var paused_at;
+
+function onKeyUp(evt) {
+	if(evt.which == 27) {
+		paused = !paused;
+		if(paused) {
+			paused_at = now();
+		} else {
+			var elapsed = now() - paused_at;
+			for(var i in ships)
+				ships[i].start_time += elapsed;
+		}
+	}
+}
 
 function init_render() {
 	// load tunnel
