@@ -24,7 +24,7 @@ function game() {
 		game.menu = new UIWindow(false,new UIPanel([
 				new UILabel("debug"),
 				new UICheckbox("show fps",function() { window.perf.window().setVisible(this.isChecked()); }),
-				new UICheckbox("640x480", function() {
+				new UICheckbox("low res", function() {
 					if(this.isChecked()) {
 						window.fixedWidth = 640; window.fixedHeight = 480;
 					} else {
@@ -51,6 +51,8 @@ function game() {
 	loadFile("javascript","barebones.js/g3d.js",function() {
 		loadFile("javascript","game.js",loader());
 		loadFile("audio","data/munch1.ogg",loader());
+		loadFile("audio","data/implosion1.ogg",loader());
+		loadFile("audio","data/explosion1.ogg",loader());
 		for(var i=1; i<=8; i++)
 			new G3D("data/fighter"+i+".g3d", loader());
 	});

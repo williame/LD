@@ -14,7 +14,7 @@ var to = {
 	jaws: 0.5,
 };
 
-var game_v = 0, game_h = 0, game_x = 0, game_y = 0, game_z = 0, game_shudder;
+var game_v = 0, game_h = 0, game_x = 0, game_y = 0, game_z = 0, game_shudder, game_exploding;
 
 var ships = [];
 
@@ -35,6 +35,7 @@ function new_game() {
 }
 
 function update() {
+	if(game_exploding) return 0;
 	var now = window.now(), t = Math.min(max_step, now - last_tick);
 	for(var i=0; i<t; i+=step_size) {
 		tick(step_size);
@@ -55,7 +56,21 @@ function tick(t) {
 		if(to.jaws <= 0.5) {
 			playSound(getFile("audio", "data/munch1.ogg"));
 		}
+		var closing = to.jaws < 7;
 		to.jaws = Math.min(7, to.jaws * 1.5);
+		if(closing && to.jaws == 7) {
+			var eat = false;
+			for(var i=ships.length; i-->0; ) {
+				var ship = ships[i];
+				var z = (now() - ship.start_time) / ship.speed, p = ship.path(z);
+				if(vec3_distance_sqrd([p[0], p[1], z], to.eye) < 0.6) {
+					ships.splice(i, 1);
+					eat = true;
+				}
+			}
+			if(eat)
+				playSound(getFile("audio", "data/implosion1.ogg"));
+		}
 	} else {
 		to.jaws = Math.max(0.5, to.jaws * 0.9);
 	}
@@ -73,6 +88,16 @@ function tick(t) {
 		game_y += game_v;
 		game_z += speed_forward; // fixed speed forward if you're weaving
 		camera();
+		// check for collisions
+		for(var ship in ships) {
+			ship = ships[ship];
+			var z = (now() - ship.start_time) / ship.speed, p = ship.path(z);
+			if(vec3_distance_sqrd([p[0], p[1], z], to.eye) < 0.3) {
+				game_exploding = now();
+				playSound(getFile("audio", "data/explosion1.ogg"));
+				break;
+			}
+		}
 	}
 }
 
@@ -162,6 +187,8 @@ function ray_march(from, towards, smooth) { // same ray march as shader, transcr
 
 var tunnel_prog, tunnel_vbo, tunnel_channel_0;
 
+var explosion_prog, explosion_channel_0;
+
 var night_sky;
 
 var ship_prog, ship_models = [];
@@ -196,6 +223,9 @@ function init_render() {
 	gl.bindBuffer(gl.ARRAY_BUFFER, null);
 	// starry night
 	loadFile("image", "data/lh94_hst.jpg", function(tex) { night_sky = tex; });
+	// explosion
+	loadFile("shader", "explosion", function(prog) { explosion_prog = prog; });
+	loadFile("image", "data/noise1.jpg", function(tex) { explosion_channel_0 = tex; });
 	// load ships
 	loadFile("shader","model", function(prog) { ship_prog = prog; });
 	var model_loaded = function(model) { ship_models.push(model); new_ship(model); };
@@ -263,9 +293,10 @@ function render() {
 	if(ship_prog && ships.length && eye) {
 		var pMatrix = new Float32Array(createPerspective(RAD2DEG*FOV,canvas.offsetWidth / canvas.offsetHeight,0.01,100));
 		var camMatrix = new Float32Array(createLookAt(eye,centre,up));
+		var t = (game_exploding? game_exploding: now());
 		for(var ship in ships) {
 			ship = ships[ship];
-			var z = (now() - ship.start_time) / ship.speed, p = ship.path(z);
+			var z = (t - ship.start_time) / ship.speed, p = ship.path(z);
 			var mvMatrix = mat4_multiply(mat4_rotation(Math.PI, [0, 1, 0]), mat4_scale(0.1));
 			mvMatrix = mat4_multiply(mat4_translation([p[0], p[1], z]), mvMatrix);
 			mvMatrix = mat4_multiply(camMatrix, mvMatrix);
@@ -286,7 +317,25 @@ function render() {
 					specularLight: [0,0,0.2],
 				}, ship_prog);
 		}
-
+	}
+	if(game_exploding && explosion_prog && tunnel_vbo && tunnel_channel_0) {
+		var t =  (now() - game_exploding) / 1000;
+		if(t > 5) t = 4 + t % 1;
+		explosion_prog(function(program) {
+			gl.depthMask(false);
+			gl.activeTexture(gl.TEXTURE0);
+			gl.bindTexture(gl.TEXTURE_2D, explosion_channel_0);
+			gl.bindBuffer(gl.ARRAY_BUFFER, tunnel_vbo);
+			gl.vertexAttribPointer(program.vertex, 3, gl.FLOAT, false, 3*4, 0);
+			gl.drawArrays(gl.TRIANGLES, 0, 6);
+			gl.bindBuffer(gl.ARRAY_BUFFER, null);	
+			gl.depthMask(true);			
+		}, {
+			__proto__: uniforms,
+			iChannelResolution0: [explosion_channel_0.width, explosion_channel_0.height],
+			iGlobalTime: t,
+		});
+		console.log(explosion_channel_0.width, explosion_channel_0.height);
 	}
 }
 
