@@ -6,15 +6,15 @@ var from = {
 	centre: null,
 	up: null,
 	jaws: 0.5,
-	quat: [0, 0, 0, 1],
 };
 var to = {
 	eye: null,
 	centre: null,
 	up: null,
 	jaws: 0.5,
-	quat: [0, 0, 0, 1],
 };
+
+var game_z = 0;
 
 var ships = [];
 
@@ -22,7 +22,7 @@ var ticks_per_sec = 10;
 var step_size = Math.trunc(1000/ticks_per_sec);
 var max_step = step_size * ticks_per_sec * 0.5;
 var last_tick;
-var speed_forward = 0.000001, speed_turn = 0.0001;
+var speed_forward = 0.01, speed_turn = 0.0001;
 
 function new_game() {
 	 from.eye = to.eye = [0, 0.5, 2];
@@ -49,7 +49,6 @@ function tick(t) {
 	from.centre = to.centre;
 	from.up = to.up;
 	from.jaws = to.jaws;
-	from.quat = to.quat;
 	// biting?
 	if(keys[32]) {
 		if(to.jaws <= 0.5) {
@@ -65,46 +64,18 @@ function tick(t) {
 	var up = keys[38]||keys[87]||keys[119]; //up arrow or W
 	var down = keys[40]||keys[83]||keys[115]; //down arrow or S
 	if(!left && !right && !up && !down) return;
-	var d = vec3_sub(from.centre, from.eye);
-	if(left && !right) to.centre = vec3_add(from.eye, vec3_rotate(d, speed_turn * t, [0, 0, 0], from.up));
-	if(right && !left) to.centre = vec3_add(from.eye, vec3_rotate(d, -speed_turn * t, [0, 0, 0], from.up));
 	if(up && !down) {
-		d = vec3_scale(d, speed_forward * t);
-		to.centre = vec3_add(from.centre, d);
-		to.eye = vec3_add(from.eye, d);
-	}
-	if(down && !up) {
-		to.centre = vec3_add(to.centre, vec3_scale(to.up, 0.3));
+		game_z += speed_forward;
 	}
 	camera();
 }
 
 function camera() {
-	var smooth = true;
-	var search = get_ball_points(to.eye, smooth);
-	// move to be right distance above wall
-	var nearest = search[0], d = search[nearest+1] - 0.5;
-	var down = vec3_scale(ball_points[nearest], d);
-	to.eye = vec3_add(to.eye, down);
-	// average all those nearby to get average up
-	search = get_ball_points(to.eye, smooth);
-	var sum = [0, 0, 0], count = 0;
-	for(var i=1; i<search.length; i++) {
-		if(search[i] < 0.7) {
-			sum = vec3_add(sum, ball_points[i-1]);
-			count++;
-		}
-	}
-	to.up = vec3_neg(vec3_normalise(vec3_scale(sum, 1/count))); // ought be already normalised, but...
-	// look another step ahead to see what the distance is there
-	forward = vec3_normalise(vec3_sub(to.centre, to.eye));
-	var ahead = vec3_scale(forward, speed_forward);
-	search = get_ball_points(ahead, smooth);
-	nearest = search[0]; d = search[nearest+1] - 0.5;
-	if(float_zero(d)) return;
-	down = vec3_scale(ball_points[nearest], d);
-	to.centre = vec3_add(to.centre, down);
-	to.quat = quat_from_lookat(forward, to.up);
+	var p = path(game_z);
+	to.eye = [p[0], p[1], game_z];
+	p = path(game_z + 1);
+	to.centre = [p[0], p[1], game_z + 1];
+	to.up = [0, 1, 0];
 }
 
 var ball_points;
