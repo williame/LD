@@ -6,6 +6,7 @@ uniform vec3 iEye, iCentre, iUp;
 uniform float iJaws;
 uniform float iTunnelLength;
 varying vec2 texel;
+varying vec3 sn;
 varying lowp vec3 lighting;
 uniform sampler2D texture;
 
@@ -247,7 +248,7 @@ void main() {
 
 	// monster mouth jaws aperture
 	if(draw_mouth(uv)) {
-		return;
+		discard;
 	}
 
 	vec3 lookAt = iCentre; //vec3(0.0, 0.0, iCentre.z);
@@ -291,9 +292,7 @@ void main() {
 		discard;
 	}
 	
-	vec4 fragColour = texture2D(texture,texel);
-	fragColour.rgb *= lighting;
-	gl_FragColor = fragColour;
+	gl_FragColor = vec4(texture2D(texture,texel).rgb * min(1., gl_FragCoord.w), 1.);
 	
 }
 

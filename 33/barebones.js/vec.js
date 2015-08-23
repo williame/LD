@@ -367,16 +367,26 @@ function quat_to_mat4(q) {
 */
 }
 
-function quat_from_lookat(forward, up) {
-	// forward and up should be normalised
-	var right = vec3_cross(up, forward);
-	var w = Math.sqrt(1 + right[0] + up[1] + forward[2]) * 0.5;
-	var w4_recip = 1 / (4 * w);
-	return [
-		(up[2] - forward[1]) * w4_recip,
-		(forward[0] - right[2]) * w4_recip,
-		(right[1] - up[0]) * w4_recip,
-		w];
+function quat_from_two_vec3(a, b) {
+	var norm_uv = Math.sqrt(vec3_length_sqrd(u) * vec3_length_sqrd(v));
+	var w = vec3_cross(u, v);
+	return quat_normalise([norm_uv + vec3_dot(u, v), w[0], w[1], w[2]]); // suspect w is first not last
+}
+
+function quat_from_vec3(axis, rot) {
+	var half = rot / 2, s = Math.sin(half);
+	return [axis[0]*s, axis[1]*s, axis[2]*s, Math.cos(half)];
+}
+
+function quat_from_lookat(eye, centre, up) {
+	eye = vec3_normalise(eye);
+	centre = vec3_normalise(centre);
+	var dot = vec3_dot(eye, centre);    
+	if(float_equ(dot,-1)) return quat_from_vec3(up, Math.PI);
+	if(float_equ(dot, 1)) return [0, 0, 0, 1];
+	var rot = Math.acos(dot);
+	var axis = vec3_normalise(vec3_cross(eye, centre));
+	return quat_from_vec3(axis, rot);
 }
 
 function quat_inverse(q) {

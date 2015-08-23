@@ -22,7 +22,7 @@ var ticks_per_sec = 10;
 var step_size = Math.trunc(1000/ticks_per_sec);
 var max_step = step_size * ticks_per_sec * 0.5;
 var last_tick;
-var speed_forward = 0.01, speed_turn = 0.0001;
+var speed_forward = 0.02, speed_turn = 0.0001;
 
 function new_game() {
 	 from.eye = to.eye = [0, 0.5, 2];
@@ -221,11 +221,12 @@ function render() {
 	if(ship_prog && ships.length && eye) {
 		var pMatrix = new Float32Array(createPerspective(RAD2DEG*FOV,canvas.offsetWidth / canvas.offsetHeight,0.01,100));
 		var camMatrix = new Float32Array(createLookAt(eye,centre,up));
-		var mvModel = mat4_multiply(mat4_rotation(Math.PI, [0, 1, 0]), mat4_scale(0.5));
 		for(var ship in ships) {
 			ship = ships[ship];
-			var t = (now() - ship.start_time) / ship.speed, p = ship.path(t);
-			var mvMatrix = mat4_multiply(mat4_translation([p[0], p[1], t]),mvModel);
+			var z = (now() - ship.start_time) / ship.speed;
+			var p = vec3_lerp(ship.path(z), ship.path(z+1/(ship.speed/ticks_per_sec)), t);
+			var mvMatrix = mat4_multiply(mat4_rotation(Math.PI, [0, 1, 0]), mat4_scale(0.1));
+			mvMatrix = mat4_multiply(mat4_translation([p[0], p[1], z]), mvMatrix);
 			mvMatrix = mat4_multiply(camMatrix, mvMatrix);
 			var nMatrix = mat4_mat3(mat4_transpose(mat4_inverse(mvMatrix)));
 			ship.model.drawCustom({
