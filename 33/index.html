@@ -29,6 +29,13 @@ function game() {
 					}
 					window.onresize();
 				}),
+				new UICheckbox("music",function() {
+					var soundtrack = document.getElementById("soundtrack_control");
+					if(this.isChecked())
+						soundtrack.play();
+					else
+						soundtrack.pause();
+				},null,true),
 				new UIButton("pause",function() { paused = !paused; }),
 			],UILayoutRows));
 		game.menu.ctrl.allowClickThru = false;
@@ -64,5 +71,8 @@ if(!isOnFileSystem() && !isLocalHost()) {
 <canvas id="main-canvas" moz-opaque>
 <div class="error">Sorry, you don't have webGL enabled :(</div>
 </canvas>
+<audio autoplay loop="loop" id="soundtrack_control" style="position:fixed;bottom:0px;left:0px;z-order:100000;">
+	<source src="data/Right Behind You.mp3" type="audio/mpeg" />
+</audio>
 </body>
 </html>

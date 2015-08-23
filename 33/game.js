@@ -52,40 +52,39 @@ function tick(t) {
 	// move keys?
 	var left = keys[37]||keys[65]||keys[97]; //left arrow or A
 	var right = keys[39]||keys[68]||keys[100]; //right arrow or D
-	var forward = keys[38]||keys[87]||keys[119]; //up arrow or W
-	if(!left && !right && !forward) return;
+	var up = keys[38]||keys[87]||keys[119]; //up arrow or W
+	var down = keys[40]||keys[83]||keys[115]; //down arrow or S
+	if(!left && !right && !up && !down) return;
 	var d = vec3_sub(from.centre, from.eye);
-//	if(left && !right) to.up = vec3_rotate(from.up, 0.0001 * t, [0, 0, 0], d);
-//	if(right && !left) to.up = vec3_rotate(from.up, -0.0001 * t, [0, 0, 0], d);
-	if(forward) {
-		d = vec3_scale(d, 0.00001 * t);
+	if(left && !right) to.centre = vec3_add(from.eye, vec3_rotate(d, 0.0001 * t, [0, 0, 0], from.up));
+	if(right && !left) to.centre = vec3_add(from.eye, vec3_rotate(d, -0.0001 * t, [0, 0, 0], from.up));
+	if(up && !down) {
+		d = vec3_scale(d, 0.000001 * t);
 		to.centre = vec3_add(from.centre, d);
 		to.eye = vec3_add(from.eye, d);
+	}
+	if(down && !up) {
+		to.centre = vec3_add(to.centre, vec3_scale(to.up, 0.3));
 	}
 	camera();
 }
 
 function camera() {
-	var search = get_ball_points(to.eye, true);
+	var smooth = true;
+	var search = get_ball_points(to.eye, smooth);
 	// move to be right distance above wall
 	var nearest = search[0], d = search[nearest+1] - 0.5;
 	if(float_zero(d)) return;
+	to.up = vec3_neg(ball_points[nearest]);
 	var down = vec3_scale(ball_points[nearest], d);
 	to.eye = vec3_add(to.eye, down);
+	// look another step ahead to see what the distance is there
+	var ahead = vec3_scale(vec3_normalise(vec3_sub(to.centre, to.eye)), 0.00001);
+	search = get_ball_points(ahead, smooth);
+	nearest = search[0]; d = search[nearest+1] - 0.5;
+	if(float_zero(d)) return;
+	down = vec3_scale(ball_points[nearest], d);
 	to.centre = vec3_add(to.centre, down);
-	// and get normal for wall
-	search = get_ball_points(to.eye, true);
-//	if(Math.abs(search[search[0]+1] - 0.5) < 0.01) // happens all the time
-//		console.log("bad dist", search);
-	var sum = [0, 0, 0], count = 0;
-	for(var i=1; i<search.length; i++) {
-		if(search[i] < 0.6) {
-			sum = vec3_add(sum, vec3_scale(ball_points[i-1], search[i]));
-			count++;
-		}
-	}
-	assert(count, search);
-	to.up = vec3_scale(sum, 1/count);
 }
 
 var ball_points;
@@ -172,7 +171,7 @@ function render() {
 		var t = update() / step_size;
 		var eye = vec3_lerp(from.eye, to.eye, t);
 		var centre = vec3_lerp(from.centre, to.centre, t);
-		var up = vec3_lerp(from.up, to.up, t); // use quat
+		var up = vec3_normalise(vec3_lerp(from.up, to.up, t)); // use quat
 		var jaws = lerp(from.jaws, to.jaws, t);
 	}
 	if(test_prog && tunnel_vbo) {
