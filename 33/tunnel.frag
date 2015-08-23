@@ -3,6 +3,7 @@ uniform vec2 iResolution;
 uniform vec2 iScreenScale;
 uniform float iFOV, iScale0;
 uniform sampler2D iChannel0;
+uniform sampler2D iChannel1;
 uniform vec3 iEye, iCentre, iUp;
 uniform float iJaws;
 uniform float iTunnelLength;
@@ -240,7 +241,7 @@ void main() {
 	
 	// Screen coordinates.
 	vec2 fragCoord = gl_FragCoord.xy * iScreenScale;
-	vec2 screenCentre = iResolution.xy*0.5;
+	vec2 screenCentre = iResolution*0.5;
 	vec2 uv = (fragCoord - screenCentre)/min(iResolution.x, iResolution.y);
 
 	// monster mouth jaws aperture
@@ -284,26 +285,22 @@ void main() {
 	}
 	
 	vec3 sceneCol = vec3(0.);
-	
-	// The ray has effectively hit the surface, so light it up.
-	if(dt<0.005){
-	
 	    // The ray marching loop (above) exits when "dt" is less than a certain threshold, which in this 
         // case, is hardcoded to "0.005." However, the distance is still "dt" from the surface? By my logic, 
 	    // adding the extra "dt" after breaking would gain a little more accuracy and effectively reduce 
 	    // surface popping? Would that be correct? I tend to do this, but could be completely wrong, so if 
 	    // someone could set me straight, it'd be appreciated. 
 	    t += dt;
-    	
+	
+	// The ray has effectively hit the surface, so light it up.
+
     	// Surface position and surface normal.
 	    vec3 sp = t * rd+camPos;
 	    if(sp.z > iTunnelLength) {
-	    	    gl_FragColor = vec4(1., 0., 0., 1.);
-	    	    return;
-	    }	    
-	    vec3 sn = getNormal(sp);
-        
+	    	    sceneCol = texture2D(iChannel1, gl_FragCoord.xy/iResolution).rgb;
+	    } else if(dt<0.005){
     	
+	    vec3 sn = getNormal(sp);
     	// Texture-based bump mapping. Comment this line out to spoil the illusion.
 	    sn = doBumpMap(iChannel0, sp*iScale0, sn, 0.05);
 	    
@@ -374,7 +371,7 @@ void main() {
         sceneCol *= atten*shading*ao;
 	   
 	
-	}
+	} else discard;
 	
 	// make rendering fairly roundish
 	float mouth_d = length(uv);

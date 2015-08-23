@@ -73,7 +73,7 @@ function tick(t) {
 function camera() {
 	var p = path(game_z);
 	to.eye = [p[0], p[1], game_z];
-	p = path(game_z + 1);
+	p = path(game_z + 0.1);
 	to.centre = [p[0], p[1], game_z + 1];
 	to.up = [0, 1, 0];
 }
@@ -143,6 +143,8 @@ function ray_march(from, towards, smooth) { // same ray march as shader, transcr
 
 var tunnel_prog, tunnel_vbo, tunnel_channel_0;
 
+var night_sky;
+
 var ship_prog, ship_models = [];
 
 function init_render() {
@@ -158,6 +160,8 @@ function init_render() {
 	gl.bindBuffer(gl.ARRAY_BUFFER, tunnel_vbo);
 	gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1,1, 1,1,1, -1,1,1, -1,-1,1, 1,-1,1, 1,1,1]), gl.STATIC_DRAW);
 	gl.bindBuffer(gl.ARRAY_BUFFER, null);
+	// starry night
+	loadFile("image", "data/lh94_hst.jpg", function(tex) { night_sky = tex; });
 	// load ships
 	loadFile("shader","model", function(prog) { ship_prog = prog; });
 	var model_loaded = function(model) { ship_models.push(model); new_ship(model); };
@@ -185,14 +189,15 @@ function render() {
 		var uniforms = {
 			iResolution: [canvas.offsetWidth, canvas.offsetHeight], // based on window not canvas res
 			iScreenScale: [canvas.offsetWidth/canvas.width, canvas.offsetHeight/canvas.height],
-			iChannel0: tunnel_channel_0,
+			iChannel0: 0,
+			iChannel1: 1,
 			iScale0: 0.7,
 			iFOV: FOV,
 			iEye: eye,
 			iCentre: centre,
 			iUp: up,
 			iJaws: jaws,
-			iTunnelLength: 100,
+			iTunnelLength: 30,
 		};
 	}
 	if(test_prog && tunnel_vbo) {
@@ -210,6 +215,9 @@ function render() {
 	if(!test_prog && tunnel_prog && tunnel_channel_0 && eye) {
 		tunnel_prog(function(program) {
 				gl.depthMask(false);
+				gl.activeTexture(gl.TEXTURE1);
+				gl.bindTexture(gl.TEXTURE_2D, night_sky);
+				gl.activeTexture(gl.TEXTURE0);
 				gl.bindTexture(gl.TEXTURE_2D, tunnel_channel_0);
 				gl.bindBuffer(gl.ARRAY_BUFFER, tunnel_vbo);
 				gl.vertexAttribPointer(program.vertex, 3, gl.FLOAT, false, 3*4, 0);
