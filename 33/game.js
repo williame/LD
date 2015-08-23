@@ -57,15 +57,26 @@ function tick(t) {
 }
 
 function camera() {
-	var avg = ball_point_search(to.eye, 0.4);
-	if(avg) {
-		var d = vec3_length(avg);
-		var n = vec3_scale(avg, 1/d);
-		to.up = n;
-		var down = vec3_scale(to.up, -d + 0.1);
-		to.eye = vec3_add(to.eye, down);
-		to.centre = vec3_add(to.centre, down);
+	var search = get_ball_points(to.eye, true);
+	// move to be right distance above wall
+	var nearest = search[0], d = search[nearest+1] - 0.5;
+	if(float_zero(d)) return;
+	var down = vec3_scale(ball_points[nearest], d);
+	to.eye = vec3_add(to.eye, down);
+	to.centre = vec3_add(to.centre, down);
+	// and get normal for wall
+	search = get_ball_points(to.eye, true);
+	if(Math.abs(search[search[0]+1] - 0.5) < 0.01)
+		console.log("bad dist", search);
+	var sum = [0, 0, 0], count = 0;
+	for(var i=1; i<search.length; i++) {
+		if(search[i] < 0.6) {
+			sum = vec3_add(sum, vec3_scale(ball_points[i-1], search[i]));
+			count++;
+		}
 	}
+	assert(count, search);
+	to.up = vec3_scale(sum, 1/count);
 }
 
 var ball_points;
@@ -78,26 +89,25 @@ function init_ball_points(N) {
 	    var y = i * off - 1 + (off / 2);
 	    var r = Math.sqrt(1 - y*y);
 	    var phi = i * inc;
-	    ball_points.push(vec3_normalise([Math.cos(phi)*r, y, Math.sin(phi)*r])); 
+	    ball_points.push(vec3_normalise([Math.cos(phi)*r, y, Math.sin(phi)*r])); // actually already normalised
 	}
 }
 
-function ball_point_search(p, thres) {
-	var sum=[0, 0, 0], count=0;
-	for(var i in ball_points) {
-		i = ball_points[i];
-		var dist = ray_march(p, vec3_add(p, i));
-		if(dist < thres) {
-			sum[0] += i[0] * dist;
-			sum[1] += i[1] * dist;
-			sum[2] += i[2] * dist;
-			count++;
+function get_ball_points(p, smooth) {
+	var nearest;
+	var ret = [0]; // first slot is nearest_idx, thereafter actual dists 
+	for(var i=0; i<ball_points.length; i++) {
+		var dist = ray_march(p, vec3_add(p, ball_points[i]), smooth);
+		ret.push(dist);
+		if(!i || dist < nearest) {
+			ret[0] = i;
+			nearest = dist;
 		}
 	}
-	return count? vec3_scale(sum, 1/count): null;
+	return ret;
 }
 
-function ray_march(from, towards) { // same ray march as shader, transcribed to JS
+function ray_march(from, towards, smooth) { // same ray march as shader, transcribed to JS
 	var freqA = 0.15;
 	var freqB = 0.25;
 	var ampA = 2.4;
@@ -120,7 +130,7 @@ function ray_march(from, towards) { // same ray march as shader, transcribed to 
 	var map = function(p) {
 	     var tun = vec2_sub(p, path(p[2]));
 	     var tun2 = vec2_sub(p, path2(p[2]));
-	     return 1.- smoothMinP(vec2_length(tun), vec2_length(tun2), 4.) + (0.5-surfFunc(p));
+	     return 1.- smoothMinP(vec2_length(tun), vec2_length(tun2), 4.) + (smooth? 0.5-surfFunc(p): 0);
 	};
 	var rd = vec3_normalise(vec3_sub(towards, from));
 	var t = 0.0, dt;

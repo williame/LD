@@ -68,11 +68,11 @@ vec3 triSmooth(in vec3 x){return cos(x*6.2831853)*0.25+0.25;} // Smooth version.
 // are bump mapped.
 float surfFunc(in vec3 p){
         
+//	return 0.;
    
     float n = dot(tri(p*0.48 + tri(p*0.24).yzx), vec3(0.444));
     p.xz = vec2(p.x + p.z, p.z - p.x) * 0.7071;
     return dot(tri(p*0.72 + tri(p*0.36).yzx), vec3(0.222)) + n; // Range [0, 1]
-    
     
     // Other variations to try. All have range: [0, 1]
     
@@ -260,7 +260,7 @@ void main() {
 		t += dt*0.75;
 	}
 	
-	vec3 sceneCol = vec3(1.,0.,0.);
+	vec3 sceneCol = vec3(0.);
 	
 	// The ray has effectively hit the surface, so light it up.
 	if(dt<0.005){

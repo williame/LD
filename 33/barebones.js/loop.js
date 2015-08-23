@@ -1,6 +1,6 @@
 // framework code follows:
 
-var gl, canvas, splash, audio, keys = {}, loading = true, mousePos = [-1,-1], cacheHash, unhandledEventHandler;
+var gl, canvas, splash, audio, keys = {}, loading = true, mousePos = [-1,-1], cacheHash, unhandledEventHandler, paused;
 
 function init(canvas) {
 	if(fail.error) {
@@ -26,6 +26,7 @@ function init(canvas) {
 			gl = canvas.getContext("webgl",params) || canvas.getContext("experimental-webgl",params);
 		} catch(e) {
 			console.log("Error initializing webGL:",e);
+			gl = null;
 		}
 		if(!gl) {
 			console.log(gl);
@@ -76,8 +77,6 @@ function init(canvas) {
 			onMouseDown = function(evt) {
 				isMouseDown = true;
 				if(mouseEvent(evt)) {
-					console.log("mouse(" + mousePos[0] + ", " + mousePos[1] + ") from (" +
-						(evt.pageX-evt.target.offsetLeft) + ", " + (evt.pageY-evt.target.offsetTop) + ")");
 					handleEvent("onMouseDown",evt,keys);
 					schedule.run();
 				}
@@ -238,6 +237,7 @@ function loop() {
 	if(fail.error) return;
 	try {
 		window.requestAnimFrame(loop);
+		if(paused) return;
 		schedule.run();
 		if(canvas.width && canvas.height) {
 			if(window.perf)

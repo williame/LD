@@ -29,6 +29,7 @@ function game() {
 					}
 					window.onresize();
 				}),
+				new UIButton("pause",function() { paused = !paused; }),
 			],UILayoutRows));
 		game.menu.ctrl.allowClickThru = false;
 		game.menu.layout();
