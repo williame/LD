@@ -8,6 +8,8 @@
 var ld, games, idx, targets, filters, filter, jam;
 var mosaic, scale;
 
+var uid_will = "10313";
+
 function objLength(obj) {
 	if(Object.keys) return Object.keys(obj).length;
 	var count = 0;
@@ -48,6 +50,10 @@ function set_filter(by) {
 		set_filter.used = true;
 		alert("Games matching your filter will blink red-white;\nGames *not* matching your filter will blink black+white");
 	}
+}
+
+function open_game(uid, target) {
+	window.open("http://ludumdare.com/compo/ludum-dare-" + ld + "/?action=preview&uid=" + uid, target || "ludum_dare");
 }
 
 function init() {
@@ -95,7 +101,7 @@ function init() {
 	});
 	img.addEventListener("click", function() {
 		if(current)
-			window.open("http://ludumdare.com/compo/ludum-dare-" + ld + "/?action=preview&uid=" + current, "ludum_dare");
+			open_game(current);
 	});
 	img.addEventListener("mouseleave", function() {
 		zoom.style.display = "none";
@@ -157,6 +163,8 @@ function init() {
 		var filter_html = '<i>filters:</i>&nbsp;<button onclick="set_filter()">all&nbsp;(' + objLength(games) + ")</button>&nbsp;";
 		for(var f in filters)
 			filter_html += '<button onclick="set_filter(\'' + f + '\')">' + f + "&nbsp;(" + objLength(filters[f]) + ')</button>&nbsp;';
+		if(uid_will in games)
+			filter_html += '&nbsp;<button onclick="open_game(\'' + uid_will + '\',\'_self\')">Goto Will\'s game!</button>&nbsp;';
 		document.getElementById("filters").innerHTML = filter_html;
 	});
 }

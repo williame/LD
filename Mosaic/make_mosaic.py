@@ -16,10 +16,10 @@ class Game:
             with open(self.thumbfile) as f:
                 f = StringIO(f.read())
                 self.img = Image.open(f) # problem with too-many-files-open errors
-                if self.img.mode != colour_format:
-                    print "CONVERTING %s from %s to %s"%(self,self.img.mode,colour_format)
+                if self.img.mode != "RGB":
+                    print "CONVERTING %s from %s to RGB"%(self,self.img.mode)
                     try:
-                        self.img = self.img.convert(colour_format)
+                        self.img = self.img.convert("RGB")
                     except Exception as e:
                         print "Error converting %s:" % self, e
                         self.img = None
@@ -37,14 +37,16 @@ class Game:
 if __name__=="__main__":
     
     opts, args = getopt.getopt(sys.argv[1:],"",
-        ("ld-num=","algo=","target-image=","thumb-width=","patch-width=","skip-json=","colour-format="))
+        ("ld-num=","algo=","target-image=","thumb-width=","patch-width=","skip-json=","comp="))
     opts = dict(opts)
-    colour_format = opts.get("--colour-format","RGB")
-    ld_num = int(opts.get("--ld-num","32"))
+    ld_num = int(opts.get("--ld-num","33"))
     algo = opts.get("--algo","kuhn-munkres")
     save_json = int(opts.get("--save-json","1"))
     if algo not in ("greedy","timed","test","kuhn-munkres"):
         sys.exit("unsupported algo %s" % algo)
+    comp = opts.get("--comp","all")
+    if comp not in ("all", "compo", "jam"):
+        sys.exit("unsupported comp filter %s" % comp)
     if len(args) == 1:
         target_filename = args[0]
     elif args:
@@ -64,6 +66,8 @@ if __name__=="__main__":
             index = json.load(index)
      
     # open all the images
+    if comp != "all":
+        index = [item for item in index if item[6] == (comp == "jam")]
     games = filter(lambda x: x.img,map(Game,index))
     print "loaded %d games for ld %d"%(len(games),ld_num)
  
@@ -110,7 +114,7 @@ if __name__=="__main__":
     target_w = cols * patch_w
     target_h = rows * patch_h
     print "target is %dx%d tiles, %dx%d pixels"%(cols,rows,target_w,target_h)
-    target_img = target.resize((target_w,target_h),Image.ANTIALIAS).convert(colour_format)
+    target_img = target.resize((target_w,target_h),Image.ANTIALIAS).convert("RGB")
     target = target_img.load()
     target_data_mse = []
     for y in range(rows):
@@ -143,7 +147,7 @@ if __name__=="__main__":
     out_w, out_h = cols*thumb_w, rows*thumb_h
     print "thumbs are %dx%d"%(thumb_w,thumb_h)
     print "output is %dx%d"%(out_w,out_h)
-    out = Image.new(colour_format,(out_w,out_h))
+    out = Image.new("RGB",(out_w,out_h))
     
     def done():
         # actually paste them into the output mosaic
@@ -156,13 +160,14 @@ if __name__=="__main__":
         if target_filename:
             target_pre, target_ext = os.path.splitext(os.path.basename(target_filename))
         else:
-            target_pre = "%s.%s.%s"%(target_prefix, colour_format.lower(), algo)
+            target_pre = "%s.%s.%s"%(target_prefix, comp, algo)
             target_ext = ".jpg"
         print "saving %s%s"%(target_pre,target_ext)
         out.save("%s%s"%(target_pre,target_ext))
         if save_json > 0:
             print "saving %s.idx.json"%target_pre
             json.dump({game.uid:game.placed for game in games},open("%s.idx.json"%target_pre,"w"))
+        print "URL: LD/Mosaic/index.html?ld=%d&img=%s&tw=%d&th=%d" % (ld_num, target_pre[len(str(ld_num))+1:], thumb_w, thumb_h)
     
     # place them
     print "%s placement:" % algo
@@ -284,5 +289,4 @@ if __name__=="__main__":
                 else:
                     print "(y n)?"
     else:
-        done()
-        
+        done()        
