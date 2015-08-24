@@ -6,36 +6,49 @@ var from = {
 	centre: null,
 	up: null,
 	jaws: 0.5,
+	keys: null,
+	z: 0,
+		
 };
 var to = {
 	eye: null,
 	centre: null,
 	up: null,
 	jaws: 0.5,
+	keys: null,
+	z: 0,
 };
+
+var prev_keys;
 
 var intro = true, intro_prog, intro_vbo, intro_tex;
 
-var game_v = 0, game_h = 0, game_x = 0, game_y = 0, game_z = 0, game_shudder, game_exploding;
+var game_v = 0, game_h = 0, game_x = 0, game_y = 0, game_exploding;
 
-var ships = [];
+var ships;
 
-var ticks_per_sec = 10;
+var ticks_per_sec = 5;
 var step_size = Math.trunc(1000/ticks_per_sec);
 var max_step = step_size * ticks_per_sec * 0.5;
 var last_tick;
 var speed_forward = 0.02, speed_move = 0.01;
 
-function new_game() {
-	init_ball_points(20);
-	//test_rays();
-}
-
 function start_game() {
+	to.keys = {};
 	from.eye = to.eye = [0, 0.5, 2];
 	from.centre = to.centre = [0, 0, 12];
 	from.up = to.up = vec3_normalise([1, 1, 0]);
 	camera();
+	ships = [];
+	for(var i in ship_models) {
+		var speed = [500, 560, 600, 700, 900, 1000, 1200, 1500][i]; // small is faster
+		ships.push({
+			model: ship_models[i],
+			start_time: now() - speed*2,
+			path: choose([window.path, path2]),
+			speed: speed,
+		});
+	}
 	last_tick = now();
 }	
 
@@ -55,6 +68,8 @@ function tick(t) {
 	from.centre = to.centre;
 	from.up = to.up;
 	from.jaws = to.jaws;
+	from.keys = to.keys;
+	from.z = to.z;
 	game_v = game_h = 0;
 	// biting?
 	if(keys[32]) {
@@ -84,14 +99,24 @@ function tick(t) {
 	var right = keys[39]||keys[68]||keys[100]; //right arrow or D
 	var up = keys[38]||keys[87]||keys[119]; //up arrow or W
 	var down = keys[40]||keys[83]||keys[115]; //down arrow or S
-	if(left && !right) game_h = speed_move;
-	if(right && !left) game_h = -speed_move;
-	if(up && !down) game_v = speed_move;
-	if(down && !up) game_v = -speed_move;
+	to.keys = {
+		left: left && !right,
+		right: right && !left,
+		up: up && !down,
+		down: down && !up,
+	};	
+	if(to.keys.left) game_h = speed_move;
+	if(to.keys.right) game_h = -speed_move;
+	if(to.keys.up) game_v = speed_move;
+	if(to.keys.down) game_v = -speed_move;
 	if(game_v || game_h) {
 		game_x += game_h;
 		game_y += game_v;
-		game_z += speed_forward; // fixed speed forward if you're weaving
+		var bonus = (!from.keys.left && to.keys.left) ||
+			(!from.keys.right && to.keys.right) ||
+			(!from.keys.up && to.keys.up) ||
+			(!from.keys.down && to.keys.down)? 4: 1;
+		to.z += speed_forward * bonus; // only move forward when weaving
 		camera();
 		// check for collisions
 		for(var ship in ships) {
@@ -107,23 +132,18 @@ function tick(t) {
 }
 
 function camera() {
-	var p = path(game_z);
+	var p = path(to.z), p2 = path2(to.z);
 	for(var i=0; ; i++) {
-		to.eye = [p[0] + game_x, p[1] + game_y, game_z];
+		to.eye = [p[0] + game_x, p[1] + game_y, to.z];
 		var search = get_ball_points(to.eye);
-		game_shudder = search[search[0]+1] < 0.3;
-		if(!game_shudder) break;
-		if(i < 3) {
-			game_x -= game_h;
-			game_y -= game_v;
-		} else { // if you hit a central column, well... we drag you back to main path side
-			game_x *= 0.9;
-			game_y *= 0.9;
-			break;
-		}
+		if(search[search[0]+1] > 0.3) break; // no collision?
+		var side = vec2_distance_sqrd(to.eye, p) < vec2_distance_sqrd(to.eye, p2)? p: p2;
+		var move = vec2_scale(vec2_normalise(vec2_sub(to.eye, side)), 0.1);
+		game_x -= move[0];
+		game_y -= move[1];
 	}
-	p = path(game_z + 0.1);
-	to.centre = [p[0] + game_x, p[1] + game_y, game_z + 1];
+	p = path(to.z + 0.1);
+	to.centre = [p[0] + game_x, p[1] + game_y, to.z + 1];
 	to.up = [0, 1, 0];
 }
 
@@ -216,7 +236,9 @@ function onKeyUp(evt) {
 	}
 }
 
-function init_render() {
+function init_game() {
+	init_ball_points(20);
+	//test_rays();
 	// load tunnel
 	loadFile("shader", "tunnel", function(prog) { tunnel_prog = prog; });
 	loadFile("image", "data/stone2.jpg", function(tex) {
@@ -239,16 +261,6 @@ function init_render() {
 	var model_loaded = function(model) { ship_models.push(model); if(ship_models.length == 8) 	init_intro(); };
 	for(var i=1; i<=8; i++)
 		new G3D("data/fighter"+i+".g3d", model_loaded);
-}
-
-function new_ship(model, path, speed) {
-	model = model || choose(ship_models);
-	ships.push({
-		model: model,
-		start_time: now(),
-		path: path || choose([window.path, path2]),
-		speed: speed || choose([300, 1000, 1500]), // small is faster
-	});
 }
 
 function render() {
@@ -363,7 +375,6 @@ function render() {
 			iChannelResolution0: [explosion_channel_0.width, explosion_channel_0.height],
 			iGlobalTime: t,
 		});
-		console.log(explosion_channel_0.width, explosion_channel_0.height);
 	}
 }
 

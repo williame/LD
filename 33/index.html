@@ -39,14 +39,13 @@ function game() {
 					else
 						soundtrack.pause();
 				},null,!isOnFileSystem()),
-				new UIButton("pause",function() { paused = !paused; }),
+				//new UIButton("pause",function() { paused = !paused; }),
 			],UILayoutRows));
 		game.menu.ctrl.allowClickThru = false;
 		game.menu.layout();
 		game.menu.show();
 		// lets go
-		init_render();
-		new_game();
+		init_game();
 	});
 	loadFile("javascript","barebones.js/g3d.js",function() {
 		loadFile("javascript","game.js",loader());
