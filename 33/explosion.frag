@@ -5,6 +5,7 @@ uniform vec2 iResolution;
 uniform sampler2D iChannel0;
 uniform vec2 iChannelResolution0;
 uniform float iGlobalTime;
+uniform vec3 iColour;
 
 const int ITERATIONS = 20;
 const float STEP = 0.08;
@@ -37,7 +38,7 @@ vec3 getColor(float r, float d)
 {
     vec3 c = mix(vec3(0.9), vec3(0.5, 0.4, 0.1), d);
     
-	c *= mix(vec3(1.0, 0.4, 0.0), vec3(0.5), r );
+	c *= mix(iColour, vec3(0.5), r );
     
 	return c * 4.0;
 }
@@ -55,7 +56,7 @@ vec4 scene(vec3 pos, float t)
     return vec4(getColor(rad, density), density);
 }
 
-vec3 render(vec3 eye, vec3 dir, vec2 fragCoord, float t)
+vec4 render(vec3 eye, vec3 dir, vec2 fragCoord, float t)
 {
     vec4 color = vec4(0);
     
@@ -63,8 +64,7 @@ vec3 render(vec3 eye, vec3 dir, vec2 fragCoord, float t)
     
     for (int i=0; i<ITERATIONS; i++)
     {
-        if (color.a > 0.99) continue;
-        if (length(pos) > 1.1) continue;
+        if (color.a > 0.99 || length(pos) > 1.1) break;
         
         vec4 d = scene(pos, t);
         d.rgb *= d.a;
@@ -73,7 +73,7 @@ vec3 render(vec3 eye, vec3 dir, vec2 fragCoord, float t)
         pos += dir * STEP;
     }
     
-    return clamp(color.rgb, 0.0, 1.0);
+    return clamp(color.rgba, 0.0, 1.0);
 }
 
 vec3 lookAtDir(vec2 uv, vec3 eye, vec3 at, vec3 up, float fov)
@@ -96,7 +96,7 @@ void main()
     
     float time = mod(iGlobalTime, DURATION);
 	
-    vec3 color = render(eye, dir, gl_FragCoord.xy, time);
+    vec4 color = render(eye, dir, gl_FragCoord.xy, time);
     
-    gl_FragColor = vec4(color, 1.0);
+    gl_FragColor = color; //vec4(color, 1.0);
 }

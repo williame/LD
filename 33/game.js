@@ -1,29 +1,19 @@
 
 var FOV = Math.PI/5;
 
-var from = {
-	eye: null,
-	centre: null,
-	up: null,
-	jaws: 0.5,
-	keys: null,
-	z: 0,
-		
-};
-var to = {
-	eye: null,
-	centre: null,
-	up: null,
-	jaws: 0.5,
-	keys: null,
-	z: 0,
-};
+var from, to;
 
-var prev_keys;
+var tunnel_length = 30;
 
 var intro = true, intro_prog, intro_vbo, intro_tex;
 
-var game_v = 0, game_h = 0, game_x = 0, game_y = 0, game_exploding;
+var game_count = 0, game_eaten = 0, game_exploding, game_over;
+
+var game_over_tex, game_eating;
+
+var game_v = 0, game_h = 0, game_x = 0, game_y = 0;
+
+var dialog;
 
 var ships;
 
@@ -34,14 +24,31 @@ var last_tick;
 var speed_forward = 0.02, speed_move = 0.01;
 
 function start_game() {
-	to.keys = {};
-	from.eye = to.eye = [0, 0.5, 2];
-	from.centre = to.centre = [0, 0, 12];
-	from.up = to.up = vec3_normalise([1, 1, 0]);
+	stats("start game " + ++game_count);
+	intro = game_exploding = game_over = null;
+	if(dialog) {
+		dialog.hide();
+		dialog = null;
+	}
+	game_eaten = 0;
+	from = {
+		eye: [0, 0.5, 2],
+		centre: [0, 0, 12],
+		up: vec3_normalise([1, 1, 0]),
+	};
+	to = {
+		eye: from.eye,
+		centre: from.centre,
+		up: from.up,
+		jaws: 0.5,
+		keys: {},
+		hit_wall: false,
+		z: 0,
+	};
 	camera();
 	ships = [];
 	for(var i in ship_models) {
-		var speed = [500, 560, 600, 700, 900, 1000, 1200, 1500][i]; // small is faster
+		var speed = [700, 790, 800, 900, 950, 1000, 1200, 1500][i]; // small is faster
 		ships.push({
 			model: ship_models[i],
 			start_time: now() - speed*2,
@@ -53,7 +60,7 @@ function start_game() {
 }	
 
 function update() {
-	if(game_exploding) return 0;
+	if(game_exploding || game_over) return 0;
 	var now = window.now(), t = Math.min(max_step, now - last_tick);
 	for(var i=0; i<t; i+=step_size) {
 		tick(step_size);
@@ -69,8 +76,10 @@ function tick(t) {
 	from.up = to.up;
 	from.jaws = to.jaws;
 	from.keys = to.keys;
+	from.hit_wall = to.hit_wall;
 	from.z = to.z;
 	game_v = game_h = 0;
+	to.hit_wall = false;
 	// biting?
 	if(keys[32]) {
 		if(to.jaws <= 0.5) {
@@ -86,10 +95,14 @@ function tick(t) {
 				if(vec3_distance_sqrd([p[0], p[1], z], to.eye) < 0.6) {
 					ships.splice(i, 1);
 					eat = true;
+					stats("eat " + game_eaten + " " + to.z.toFixed(2) + " " + ship.model.filename);
+					game_eaten++;
 				}
 			}
-			if(eat)
+			if(eat) {
+				game_eating = now();
 				playSound(getFile("audio", "data/implosion1.ogg"));
+			}
 		}
 	} else {
 		to.jaws = Math.max(0.5, to.jaws * 0.9);
@@ -116,7 +129,8 @@ function tick(t) {
 			(!from.keys.right && to.keys.right) ||
 			(!from.keys.up && to.keys.up) ||
 			(!from.keys.down && to.keys.down)? 4: 1;
-		to.z += speed_forward * bonus; // only move forward when weaving
+		var penalty = from.hit_wall? 0: 1;
+		to.z += speed_forward * bonus * penalty; // only move forward when weaving
 		camera();
 		// check for collisions
 		for(var ship in ships) {
@@ -125,8 +139,14 @@ function tick(t) {
 			if(vec3_distance_sqrd([p[0], p[1], z], to.eye) < 0.3) {
 				game_exploding = now();
 				playSound(getFile("audio", "data/explosion1.ogg"));
+				stats("die " + game_eaten + " " + to.z.toFixed(2) + " " + ship.model.filename);
 				break;
 			}
+		}
+		// check for end
+		if(to.z > tunnel_length -5) {
+			game_over = now();
+			stats("end " + game_eaten);
 		}
 	}
 }
@@ -141,10 +161,16 @@ function camera() {
 		var move = vec2_scale(vec2_normalise(vec2_sub(to.eye, side)), 0.1);
 		game_x -= move[0];
 		game_y -= move[1];
+		to.hit_wall = true;
 	}
 	p = path(to.z + 0.1);
 	to.centre = [p[0] + game_x, p[1] + game_y, to.z + 1];
 	to.up = [0, 1, 0];
+}
+
+function stats(message) {
+	report_info(message + " [" + canvas.offsetWidth + "x" + canvas.offsetHeight + ", " +
+		canvas.width + "x" + canvas.height + "] " + perf.fps(3).toFixed(2)+" fps");
 }
 
 var ball_points;
@@ -221,8 +247,7 @@ var ship_prog, ship_models = [];
 var paused_at;
 
 function onKeyUp(evt) {
-	if(intro) {
-		intro = null;
+	if(intro || dialog) {
 		start_game();
 	} else if(evt.which == 27) {
 		paused = !paused;
@@ -237,6 +262,7 @@ function onKeyUp(evt) {
 }
 
 function init_game() {
+	stats("init");
 	init_ball_points(20);
 	//test_rays();
 	// load tunnel
@@ -261,6 +287,8 @@ function init_game() {
 	var model_loaded = function(model) { ship_models.push(model); if(ship_models.length == 8) 	init_intro(); };
 	for(var i=1; i<=8; i++)
 		new G3D("data/fighter"+i+".g3d", model_loaded);
+	// end game
+	loadFile("image", "data/game_over.png", function(tex) { game_over_tex = tex; });
 }
 
 function render() {
@@ -301,7 +329,7 @@ function render() {
 			iCentre: centre,
 			iUp: up,
 			iJaws: jaws,
-			iTunnelLength: 30,
+			iTunnelLength: tunnel_length,
 		};
 	}
 	if(test_prog && tunnel_vbo) {
@@ -358,9 +386,35 @@ function render() {
 				}, ship_prog);
 		}
 	}
-	if(game_exploding && explosion_prog && tunnel_vbo && tunnel_channel_0) {
-		var t =  (now() - game_exploding) / 1000;
-		if(t > 5) t = 4 + t % 1;
+	if(game_eating && !game_exploding && explosion_prog && tunnel_vbo && explosion_channel_0) {
+		var t = (now() - game_eating) / 1000;
+		if(t > 2) {
+			game_eating = false;
+		}
+		explosion_prog(function(program) {
+			gl.depthFunc(gl.ALWAYS);
+			gl.depthMask(false);
+			gl.activeTexture(gl.TEXTURE0);
+			gl.bindTexture(gl.TEXTURE_2D, explosion_channel_0);
+			gl.bindBuffer(gl.ARRAY_BUFFER, tunnel_vbo);
+			gl.vertexAttribPointer(program.vertex, 3, gl.FLOAT, false, 3*4, 0);
+			gl.drawArrays(gl.TRIANGLES, 0, 6);
+			gl.bindBuffer(gl.ARRAY_BUFFER, null);	
+			gl.depthMask(true);
+			gl.depthFunc(gl.LEQUAL);
+		}, {
+			__proto__: uniforms,
+			iChannelResolution0: [explosion_channel_0.width, explosion_channel_0.height],
+			iGlobalTime: t,
+			iColour: [0.4, 0.5, 1.0],
+		});
+	}
+	if(game_exploding && explosion_prog && tunnel_vbo && explosion_channel_0) {
+		var t = (now() - game_exploding) / 1000;
+		if(t > 3 && !game_over) {
+			game_over = now();
+		}
+		t = Math.min(t, 4.5);
 		explosion_prog(function(program) {
 			gl.depthMask(false);
 			gl.activeTexture(gl.TEXTURE0);
@@ -374,11 +428,62 @@ function render() {
 			__proto__: uniforms,
 			iChannelResolution0: [explosion_channel_0.width, explosion_channel_0.height],
 			iGlobalTime: t,
+			iColour: [1, 0.4, 0],
 		});
+	}
+	if(game_over && intro_prog) {
+		var t = now() - game_over;
+		if((t % 500) < 250 || t > 2000) {
+			var pMatrix = createPerspective(RAD2DEG*FOV,canvas.offsetWidth / canvas.offsetHeight,0.01,100);
+			var mvMatrix = createLookAt([0, 0, 6], [0, 0, 0], [0, 1, 0]);
+			intro_prog(function(program) {
+					gl.depthMask(false);
+					gl.bindBuffer(gl.ARRAY_BUFFER, intro_vbo);
+					gl.vertexAttribPointer(program.vertex, 3, gl.FLOAT, false, 5*4, 0);
+					gl.vertexAttribPointer(program.texCoord, 2, gl.FLOAT, false, 5*4, 3*4);
+					gl.drawArrays(gl.TRIANGLES, 0, 6);
+					gl.bindBuffer(gl.ARRAY_BUFFER, null);
+					gl.depthMask(true);
+				},{
+					pMatrix: pMatrix,
+					mvMatrix: mvMatrix,
+					texture: game_over_tex,
+				});
+			if(t > 3000 && !dialog) {
+				if(game_exploding) {
+					show_end_game("(Try biting the ships instead of colliding with them next time!)");
+				} else {
+					show_end_game("You ate " + game_eaten + " ship" + (game_eaten == 1? "": "s") +"!");
+				}
+			}
+		}
 	}
 }
 
+function show_end_game(message) {
+	var colour = game_exploding? [0,0,0,1]: [1,1,1,1];
+	var panel = new UIPanel([
+			new UILabel(message, colour),
+			new UILabel("<ANY KEY TO PLAY AGAIN>", colour),
+		], UILayoutRows);
+	panel.bgColour = [0,0,0,0];
+	for(var child in panel.children) {
+		child = panel.children[child];
+		child.bgColour = [0,0,0,0];
+		child.fgColour = colour;
+	}
+	dialog = new UIWindow(false, panel);
+	var layout = dialog.layout;
+	dialog.layout = function() {
+		layout.apply(dialog, arguments);
+		panel.setPos([(canvas.offsetWidth-panel.width())/2, canvas.offsetHeight-panel.height()*2]);
+	}
+	dialog.layout();
+	dialog.show();
+}
+
 function init_intro() {
+	stats("intro");
 	intro_prog = Program(
 		"precision mediump float;\n"+
 		"attribute vec3 vertex;\n"+

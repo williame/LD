@@ -50,6 +50,8 @@ function getServerHost() {
 	if(!server) {
 		if(isLocalHost()) // if running locally, connect locally
 			server = window.location.host;
+		else if(window.server_host)
+			server = window.server_host;
 		else
 			server = window.location.host; //"31.192.226.244:28283"; // my private server; if you fork, you have to change this
 	}
