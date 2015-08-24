@@ -105,7 +105,8 @@ function report_error(message) {
 	var doc = new XMLHttpRequest();
 	doc.open("POST","http://"+getServerHost()+"/api/report_error",false);
 	doc.overrideMimeType("text/plain");
-	doc.onerror = function() {};
+	doc.onerror = function(evt) { console.log("report_error:", evt); };
+	doc.onreadystatechange = function () {};
 	doc.send(message);
 }
 
@@ -114,7 +115,8 @@ function report_info(message) {
 	var doc = new XMLHttpRequest();
 	doc.open("POST","http://"+getServerHost()+"/api/report_info",false);
 	doc.overrideMimeType("text/plain");
-	doc.onerror = function() {};
+	doc.onerror = function(evt) { console.log("report_info:", evt); };
+	doc.onreadystatechange = function () {};
 	doc.send(message);
 }
 
