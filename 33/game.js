@@ -3,7 +3,7 @@ var FOV = Math.PI/5;
 
 var from, to;
 
-var tunnel_length = 30;
+var tunnel_length = 90;
 
 var intro = true, intro_prog, intro_vbo, intro_tex;
 
@@ -358,13 +358,14 @@ function render() {
 				gl.depthMask(true);
 			}, uniforms);
 	}
-	if(ship_prog && ships.length && eye && !game_exploding) {
+	if(ship_prog && ships.length && eye && !game_exploding && !game_over) {
 		var pMatrix = createPerspective(RAD2DEG*FOV,canvas.offsetWidth / canvas.offsetHeight,0.01,100);
 		var camMatrix = createLookAt(eye,centre,up);
-		var t = (game_exploding? game_exploding: now());
+		var all_out = true;
 		for(var ship in ships) {
 			ship = ships[ship];
-			var z = (t - ship.start_time) / ship.speed, p = ship.path(z);
+			var z = (now() - ship.start_time) / ship.speed, p = ship.path(z);
+			if(z < tunnel_length) all_out = false;
 			var mvMatrix = mat4_multiply(mat4_rotation(Math.PI, [0, 1, 0]), mat4_scale(0.1));
 			mvMatrix = mat4_multiply(mat4_translation([p[0], p[1], z]), mvMatrix);
 			mvMatrix = mat4_multiply(camMatrix, mvMatrix);
@@ -385,6 +386,8 @@ function render() {
 					specularLight: [0,0,0.2],
 				}, ship_prog);
 		}
+		if(all_out)
+			game_over = now();
 	}
 	if(game_eating && !game_exploding && explosion_prog && tunnel_vbo && explosion_channel_0) {
 		var t = (now() - game_eating) / 1000;
@@ -453,7 +456,7 @@ function render() {
 				if(game_exploding) {
 					show_end_game("(Try biting the ships instead of colliding with them next time!)");
 				} else {
-					show_end_game("You ate " + game_eaten + " ship" + (game_eaten == 1? "": "s") +"!");
+					show_end_game();
 				}
 			}
 		}
@@ -463,7 +466,7 @@ function render() {
 function show_end_game(message) {
 	var colour = game_exploding? [0,0,0,1]: [1,1,1,1];
 	var panel = new UIPanel([
-			new UILabel(message, colour),
+			new UILabel((message? message+"\n": "") + "You ate " + game_eaten + " ship" + (game_eaten == 1? "": "s") +"!", colour),
 			new UILabel("<ANY KEY TO PLAY AGAIN>", colour),
 		], UILayoutRows);
 	panel.bgColour = [0,0,0,0];
