@@ -14,6 +14,8 @@ var to = {
 	jaws: 0.5,
 };
 
+var intro = true, intro_prog, intro_vbo, intro_tex;
+
 var game_v = 0, game_h = 0, game_x = 0, game_y = 0, game_z = 0, game_shudder, game_exploding;
 
 var ships = [];
@@ -25,14 +27,17 @@ var last_tick;
 var speed_forward = 0.02, speed_move = 0.01;
 
 function new_game() {
-	 from.eye = to.eye = [0, 0.5, 2];
-	 from.centre = to.centre = [0, 0, 12];
-	 from.up = to.up = vec3_normalise([1, 1, 0]);
-	 init_ball_points(20);
-	 camera();
-	 //test_rays();
-	 last_tick = now();
+	init_ball_points(20);
+	//test_rays();
 }
+
+function start_game() {
+	from.eye = to.eye = [0, 0.5, 2];
+	from.centre = to.centre = [0, 0, 12];
+	from.up = to.up = vec3_normalise([1, 1, 0]);
+	camera();
+	last_tick = now();
+}	
 
 function update() {
 	if(game_exploding) return 0;
@@ -196,7 +201,10 @@ var ship_prog, ship_models = [];
 var paused_at;
 
 function onKeyUp(evt) {
-	if(evt.which == 27) {
+	if(intro) {
+		intro = null;
+		start_game();
+	} else if(evt.which == 27) {
 		paused = !paused;
 		if(paused) {
 			paused_at = now();
@@ -228,7 +236,7 @@ function init_render() {
 	loadFile("image", "data/noise1.jpg", function(tex) { explosion_channel_0 = tex; });
 	// load ships
 	loadFile("shader","model", function(prog) { ship_prog = prog; });
-	var model_loaded = function(model) { ship_models.push(model); new_ship(model); };
+	var model_loaded = function(model) { ship_models.push(model); if(ship_models.length == 8) 	init_intro(); };
 	for(var i=1; i<=8; i++)
 		new G3D("data/fighter"+i+".g3d", model_loaded);
 }
@@ -244,6 +252,26 @@ function new_ship(model, path, speed) {
 }
 
 function render() {
+	if(intro) {
+		if(!intro_tex) return;
+		var t = Math.min(-1.2, -3.5 + (now() - intro) / 8000);
+		var pMatrix = createPerspective(RAD2DEG*FOV,canvas.offsetWidth / canvas.offsetHeight,0.01,100);
+		var mvMatrix = createLookAt([0, -6, 2], [0, 0, 0], [0, 1, 0]);
+		mvMatrix = mat4_multiply(mvMatrix, mat4_scale(1, 2, 1));
+		mvMatrix = mat4_multiply(mvMatrix, mat4_translation([0, t, 0]));
+		intro_prog(function(program) {
+				gl.bindBuffer(gl.ARRAY_BUFFER, intro_vbo);
+				gl.vertexAttribPointer(program.vertex, 3, gl.FLOAT, false, 5*4, 0);
+				gl.vertexAttribPointer(program.texCoord, 2, gl.FLOAT, false, 5*4, 3*4);
+				gl.drawArrays(gl.TRIANGLES, 0, 6);
+				gl.bindBuffer(gl.ARRAY_BUFFER, null);	
+			},{
+				pMatrix: pMatrix,
+				mvMatrix: mvMatrix,
+				texture: intro_tex,
+			});
+		return;
+	}
 	if(to.eye) { // game inited
 		var t = update() / step_size;
 		var eye = vec3_lerp(from.eye, to.eye, t);
@@ -290,9 +318,9 @@ function render() {
 				gl.depthMask(true);
 			}, uniforms);
 	}
-	if(ship_prog && ships.length && eye) {
-		var pMatrix = new Float32Array(createPerspective(RAD2DEG*FOV,canvas.offsetWidth / canvas.offsetHeight,0.01,100));
-		var camMatrix = new Float32Array(createLookAt(eye,centre,up));
+	if(ship_prog && ships.length && eye && !game_exploding) {
+		var pMatrix = createPerspective(RAD2DEG*FOV,canvas.offsetWidth / canvas.offsetHeight,0.01,100);
+		var camMatrix = createLookAt(eye,centre,up);
 		var t = (game_exploding? game_exploding: now());
 		for(var ship in ships) {
 			ship = ships[ship];
@@ -337,6 +365,30 @@ function render() {
 		});
 		console.log(explosion_channel_0.width, explosion_channel_0.height);
 	}
+}
+
+function init_intro() {
+	intro_prog = Program(
+		"precision mediump float;\n"+
+		"attribute vec3 vertex;\n"+
+		"attribute vec2 texCoord;\n"+
+		"uniform mat4 mvMatrix, pMatrix;\n"+
+		"varying vec2 texel;\n"+
+		"void main() {\n"+
+		"	texel = texCoord;\n"+
+		"	gl_Position = pMatrix * mvMatrix * vec4(vertex,1.0);\n"+
+		"}\n",
+		"precision mediump float;\n"+
+		"uniform sampler2D texture;\n"+
+		"varying vec2 texel;\n"+
+		"void main() {\n"+
+		"	gl_FragColor = texture2D(texture, texel);\n"+
+		"}\n");
+	loadFile("image", "data/intro.png", function(tex) { intro_tex = tex; intro = now(); });
+	intro_vbo = gl.createBuffer();
+	gl.bindBuffer(gl.ARRAY_BUFFER, intro_vbo);
+	gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1,1, 0,0, 1,1,1, 1,1, -1,1,1, 0,1, -1,-1,1, 0,0, 1,-1,1, 1,0, 1,1,1, 1,1]), gl.STATIC_DRAW);
+	gl.bindBuffer(gl.ARRAY_BUFFER, null);
 }
 
 var test_prog, test_tex;

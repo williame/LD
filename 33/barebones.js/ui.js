@@ -417,7 +417,7 @@ UIContext.prototype = {
 		gl.disable(gl.DEPTH_TEST);
 		gl.uniformMatrix4fv(program.mvp,false,mvp);
 		gl.uniform1i(program.texture,0);
-		gl.uniform1f(program.z,0.6);
+		gl.uniform1f(program.z,this.z||0.6);
 		gl.bindBuffer(gl.ARRAY_BUFFER,this.vbo);
 		gl.activeTexture(gl.TEXTURE0);
 		gl.enableVertexAttribArray(program.vertex);
