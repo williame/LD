@@ -213,6 +213,7 @@ class APIHandler(BaseHandler):
         else:
             raise tornado.web.HTTPError(404)
     def post(self,entryPoint):
+        self.set_header("Access-Control-Allow-Origin", "*") # so can be used from e.g. github hosted sites
         if entryPoint == "report_error":
             return self.log_error(" ====== USER ERROR ======\n%s\n ========================",self.request.body)
         elif entryPoint == "report_info":
