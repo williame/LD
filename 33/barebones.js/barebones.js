@@ -100,25 +100,23 @@ var fail = fail || function(error) {
 	throw error;
 }
 
-function report_error(message) {
+function _server_post_silent(page, body, mimeType) {
 	if(isOnFileSystem()) return;
-	var doc = new XMLHttpRequest();
-	doc.open("POST","http://"+getServerHost()+"/api/report_error",false);
-	doc.overrideMimeType("text/plain");
-	doc.onerror = function(evt) { console.log("report_error:", evt); };
-	doc.onreadystatechange = function () {};
-	doc.send(message);
+	try {
+		var doc = new XMLHttpRequest();
+		doc.open("POST","http://"+getServerHost()+"/api/" + page,false);
+		doc.overrideMimeType(mimeType || "text/plain");
+		doc.onerror = function(evt) { console.log(page+ ": ", evt, body); };
+		doc.onreadystatechange = function () {};
+		doc.send(body);
+	} catch(e) {
+		console.log(page+ ": ", e, body);
+	}
 }
 
-function report_info(message) {
-	if(isOnFileSystem()) return;
-	var doc = new XMLHttpRequest();
-	doc.open("POST","http://"+getServerHost()+"/api/report_info",false);
-	doc.overrideMimeType("text/plain");
-	doc.onerror = function(evt) { console.log("report_info:", evt); };
-	doc.onreadystatechange = function () {};
-	doc.send(message);
-}
+function report_error(message) { _server_post_silent("report_error", message); }
+
+function report_info(message) { _server_post_silent("report_info", message); }
 
 var assert = assert || function(condition,msg) {
 	if(!condition)
