@@ -137,6 +137,7 @@ function init() {
 		idx = data;
 		if(mosaic) loadIdx(idx);
 	});
+	var first = true;
 	loadJSON(ld + "/games.json", function(data) {
 		games = {}; targets = {}; jams = 0;
 		filters = { Web: {}, Windows: {}, Linux: {}, Source: {}};
@@ -166,6 +167,7 @@ function init() {
 		if(uid_will in games)
 			filter_html += '&nbsp;<button onclick="open_game(\'' + uid_will + '\',\'_self\')">Goto Will\'s game!</button>&nbsp;';
 		document.getElementById("filters").innerHTML = filter_html;
+		window.onresize(); // force relayout to take account for this div
 	});
 }
 
