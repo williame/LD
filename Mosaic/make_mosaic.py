@@ -164,6 +164,7 @@ if __name__=="__main__":
             target_ext = ".jpg"
         print "saving %s%s"%(target_pre,target_ext)
         out.save("%s%s"%(target_pre,target_ext))
+        out.resize((320, int(float(out_h)*(320.0/out_w)))).save("%s.small%s"%(target_pre,target_ext))
         if save_json > 0:
             print "saving %s.idx.json"%target_pre
             json.dump({game.uid:game.placed for game in games},open("%s.idx.json"%target_pre,"w"))
