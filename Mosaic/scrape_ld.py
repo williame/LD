@@ -16,10 +16,17 @@ def scrape_ld(ld_num, dest_folder=None):
         os.makedirs(dest_folder)
         
     def get_page(url, timeout=10):
-        f = urllib2.urlopen(url, timeout=timeout)
-        contents = f.read().decode('utf-8','replace')
-        f.close()
-        return contents
+        for tries in range(3):
+            try:
+                f = urllib2.urlopen(url, timeout=timeout)
+                contents = f.read().decode('utf-8','replace')
+                f.close()
+                return contents
+            except Exception as e:
+                with lock:
+                    print >> sys.stderr, "ERROR getting %s #%d: %s" % (url, tries, e)
+        else:
+            raise e
 
     def get_games_on_page(url):
         return entry_re.findall(get_page(url))
@@ -75,7 +82,7 @@ def scrape_ld(ld_num, dest_folder=None):
         
     game_matches = []
     game_count = 0
-    pool = ThreadPool(10)        
+    pool = ThreadPool(5)        
     while True:
         page = entries_page_url_template = "http://www.ludumdare.com/compo/ludum-dare-%d/?action=preview&etype=&start=%d" % (ld_num, game_count)
         with lock:
