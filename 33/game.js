@@ -238,7 +238,7 @@ function ray_march(from, towards, smooth) { // same ray march as shader, transcr
 
 var tunnel_prog, tunnel_vbo, tunnel_channel_0;
 
-var explosion_prog, explosion_channel_0;
+var explosion_prog, explosion_channel_0, game_eating_tex;
 
 var night_sky;
 
@@ -282,6 +282,7 @@ function init_game() {
 	// explosion
 	loadFile("shader", "explosion", function(prog) { explosion_prog = prog; });
 	loadFile("image", "data/noise1.jpg", function(tex) { explosion_channel_0 = tex; });
+	loadFile("image", "data/noise1.png", function(tex) { game_eating_tex = tex; });
 	// load ships
 	loadFile("shader","model", function(prog) { ship_prog = prog; });
 	var model_loaded = function(model) { ship_models.push(model); if(ship_models.length == 8) 	init_intro(); };
@@ -391,14 +392,14 @@ function render() {
 	}
 	if(game_eating && !game_exploding && explosion_prog && tunnel_vbo && explosion_channel_0) {
 		var t = (now() - game_eating) / 1000;
-		if(t > 2) {
+		if(t > 0.5) {
 			game_eating = false;
 		}
 		explosion_prog(function(program) {
 			gl.depthFunc(gl.ALWAYS);
 			gl.depthMask(false);
 			gl.activeTexture(gl.TEXTURE0);
-			gl.bindTexture(gl.TEXTURE_2D, explosion_channel_0);
+			gl.bindTexture(gl.TEXTURE_2D, game_eating_tex);
 			gl.bindBuffer(gl.ARRAY_BUFFER, tunnel_vbo);
 			gl.vertexAttribPointer(program.vertex, 3, gl.FLOAT, false, 3*4, 0);
 			gl.drawArrays(gl.TRIANGLES, 0, 6);
