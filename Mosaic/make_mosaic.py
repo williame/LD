@@ -73,7 +73,7 @@ if __name__=="__main__":
  
     # load the target image
     target_imagename = opts.get("--target-image","mona_lisa.jpg")
-    target = Image.open(target_imagename)
+    target = Image.open(os.path.expanduser(target_imagename))
     print "target image %s is %dx%d"%(target_imagename,target.size[0],target.size[1])
     target_prefix = "%d/%s" % (ld_num, os.path.splitext(os.path.basename(target_imagename))[0])
     
