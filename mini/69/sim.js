@@ -15,7 +15,7 @@ function BooleanPalette(False, True) {
 
 function AlphaPalette(r, g, b, a, max) {
 	return function(v) {
-		return "rgba(" + r + "," + g + "," + b + "," + (v / max * a) + ")";
+		return "rgba(" + r + "," + g + "," + b + "," + Math.min(v / max * a, a) + ")";
 	};
 };
 
@@ -60,10 +60,10 @@ function World(W, H) {
 	this.nest = new Layer(this, BooleanPalette("rgba(0,0,0,0)", "rgba(0,0,255,1)"));
 	this.ants = new Layer(this, BooleanPalette("rgba(0,0,0,0)", "rgba(255,255,255,1)"));
 	this.food = new Layer(this, BooleanPalette("rgba(0,0,0,0)", "rgba(255,0,0,1)"));
-	this.pheremone_food_max = 3;
-	this.pheremone_food = new Layer(this, AlphaPalette(255, 0, 255, 0.75, this.pheremone_food_max));
-	this.pheremone_nest_max = 3;
-	this.pheremone_nest = new Layer(this, AlphaPalette(255, 255, 0, 0.75, this.pheremone_nest_max));
+	this.pheromone_food_max = 3;
+	this.pheromone_food = new Layer(this, AlphaPalette(255, 0, 255, 0.75, this.pheromone_food_max));
+	this.pheromone_nest_max = 3;
+	this.pheromone_nest = new Layer(this, AlphaPalette(255, 255, 0, 0.75, this.pheromone_nest_max));
 };
 World.prototype = {
 	encode_pos: function(pos) {
@@ -92,13 +92,13 @@ World.prototype = {
 					ant.seek_food(); 
 				}
 			}
-			this.age_pheremone(this.pheremone_food);
-			this.age_pheremone(this.pheremone_nest);
+			this.age_pheromone(this.pheromone_food);
+			this.age_pheromone(this.pheromone_nest);
 		},
-	age_pheremone: function(pheremone) {
+	age_pheromone: function(pheromone) {
 			var next = {}, faded = [], phem, count = 0;
-			for (phem in pheremone.occupied) {
-				var age = pheremone.occupied[phem] - 0.001;
+			for (phem in pheromone.occupied) {
+				var age = pheromone.occupied[phem] - 0.001;
 				if (age > 0) {
 					next[phem] = age;
 				} else {
@@ -107,9 +107,9 @@ World.prototype = {
 				}
 			}
 			for (phem = 0; phem < count; phem++) {
-				pheremone.set(this.decode_pos(faded[phem]), 0);
+				pheromone.set(this.decode_pos(faded[phem]), 0);
 			}
-			pheremone.occupied = next;
+			pheromone.occupied = next;
 		},		
 };
 
@@ -146,7 +146,7 @@ Ant.prototype = {
 			console.assert(this.food);
 			this.world.food.set(this.pos, (this.world.food.get(this.pos) || 0) + 1);
 			this.food = false;
-			this._mark_trail(world.nest, world.pheremone_nest, world.pheremone_nest_max);
+			this._mark_trail(world.nest, world.pheromone_nest, world.pheromone_nest_max);
 		},
 	take_food: function() {
 			console.assert(!this.food);
@@ -154,9 +154,9 @@ Ant.prototype = {
 			console.assert(food, this.pos);
 			this.world.food.set(this.pos, food - 1);
 			this.food = true;
-			this._mark_trail(world.food, world.pheremone_food, world.pheremone_food_max);
+			this._mark_trail(world.food, world.pheromone_food, world.pheromone_food_max);
 		},
-	_mark_trail: function(target, pheremone, max) {
+	_mark_trail: function(target, pheromone, max) {
 			var world = this.world;
 			var threshold = Math.max(0, this.age - Math.max(world.W, world.H) * 2);
 			var max = (this.age - threshold);
@@ -183,7 +183,7 @@ Ant.prototype = {
 				for (pos in trail) {
 					var weight = (trail[pos] - threshold) / max;
 					pos = world.decode_pos(pos);
-					pheremone.set(pos, Math.min((pheremone.get(pos) || 0) + weight, max));
+					pheromone.set(pos, Math.min((pheromone.get(pos) || 0) + weight, max));
 				}
 			}
 			this.age = 0;
@@ -204,7 +204,7 @@ Ant.prototype = {
 			} else if (ahead && world.food.get(ahead) && !world.nest.get(ahead) && !world.ants.get(ahead)) {
 				this.move_forward();
 			} else {
-				this._seek(world.food, world.pheremone_food, world.pheremone_food_max);
+				this._seek(world.food, world.pheromone_food, world.pheromone_food_max);
 			}
 		},
 	seek_nest: function() {
@@ -214,10 +214,10 @@ Ant.prototype = {
 			} else if (ahead && world.nest.get(ahead) && !world.ants.get(ahead)) {
 				this.move_forward();
 			} else {
-				this._seek(world.nest, world.pheremone_nest, world.pheremone_nest_max);
+				this._seek(world.nest, world.pheromone_nest, world.pheromone_nest_max);
 			}
 		},
-	_seek: function(target, pheremone, max) {
+	_seek: function(target, pheromone, max) {
 			var world = this.world;
 			var nearby = new Array(5), ahead = 2, can_move = false, i;
 			for (i = nearby.length; i --> 0; ) {
@@ -235,15 +235,15 @@ Ant.prototype = {
 			for (i = nearby.length; i --> 0; ) {
 				candidates[i] = 0;
 				if (nearby[i]) {
-					candidates[i] += (target.get(nearby[i]) || 0) * max; // favour real target over pheremone
-					candidates[i] += pheremone.get(nearby[i]) || 0;
+					candidates[i] += target.get(nearby[i])? max: 0; // favour real target over pheromone
+					candidates[i] += (pheromone.get(nearby[i]) || 0); // * (ahead - Math.abs(i - ahead)); // favour ahead
 				}
 			}
 			var max = Math.max.apply(null, candidates);
 			if (!max) { // nowhere tempting?  favour going forwards
 				for (i = nearby.length; i --> 0; ) {
 					if (nearby[i]) {
-						candidates[i] = Math.random() + (i == ahead? Math.random() * 2: 0);
+						candidates[i] = Math.random() * (ahead - Math.abs(i - ahead)); // favour ahead
 						max = Math.max(max, candidates[i]);
 					}
 				}

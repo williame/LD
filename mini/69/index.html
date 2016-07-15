@@ -51,8 +51,8 @@ var main_canvas, last_tick, speed = 100;
 function draw() {
 	var ctx = main_canvas.getContext("2d");
 	ctx.clearRect(0, 0, main_canvas.width, main_canvas.height);
-	ctx.drawImage(world.pheremone_nest.img, 0, 0, main_canvas.width, main_canvas.height);
-	ctx.drawImage(world.pheremone_food.img, 0, 0, main_canvas.width, main_canvas.height);
+	ctx.drawImage(world.pheromone_nest.img, 0, 0, main_canvas.width, main_canvas.height);
+	ctx.drawImage(world.pheromone_food.img, 0, 0, main_canvas.width, main_canvas.height);
 	ctx.drawImage(world.food.img, 0, 0, main_canvas.width, main_canvas.height);
 	ctx.drawImage(world.nest.img, 0, 0, main_canvas.width, main_canvas.height);
 	ctx.drawImage(world.ants.img, 0, 0, main_canvas.width, main_canvas.height);
