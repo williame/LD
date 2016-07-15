@@ -54,18 +54,22 @@ function draw() {
 	ctx.drawImage(world.pheromone_nest.img, 0, 0, main_canvas.width, main_canvas.height);
 	ctx.drawImage(world.pheromone_food.img, 0, 0, main_canvas.width, main_canvas.height);
 	ctx.drawImage(world.food.img, 0, 0, main_canvas.width, main_canvas.height);
+	ctx.drawImage(world.foraging.img, 0, 0, main_canvas.width, main_canvas.height);
+	ctx.drawImage(world.returning.img, 0, 0, main_canvas.width, main_canvas.height);
 	ctx.drawImage(world.nest.img, 0, 0, main_canvas.width, main_canvas.height);
-	ctx.drawImage(world.ants.img, 0, 0, main_canvas.width, main_canvas.height);
 }
 
 function render() {
-	requestAnimationFrame(render);
-	var elapsed = Date.now() - last_tick;
+	var now = Date.now(), elapsed = now - last_tick;
 	while (elapsed > speed) {
 		world.step();
 		elapsed -= speed;
 		last_tick += speed;
+		/*var end = Date.now();
+		console.log("step", end - now);
+		now = end;*/
 	}
+	requestAnimationFrame(render);
 	draw();
 }
 

@@ -1,5 +1,12 @@
 "use strict";
 
+function assert(cond) {
+	if (!cond) {
+		console.log.apply(console, arguments);
+		throw Error(123);
+	}
+}
+
 var world;
 
 function mod(n, m) { // always returns a positive number
@@ -19,9 +26,9 @@ function AlphaPalette(r, g, b, a, max) {
 	};
 };
 
-function Layer(world, palette) {
-	console.assert(this instanceof Layer, this);
-	console.assert(world instanceof World, world);
+function Layer(world, palette, storage) {
+	assert(this instanceof Layer, this);
+	assert(world instanceof World, world);
 	this.world = world;
 	this.palette = palette;
 	if (this.palette) {
@@ -30,22 +37,35 @@ function Layer(world, palette) {
 		this.img.height = this.world.H;
 		this.ctx = this.img.getContext("2d");
 	}
-	this.occupied = {};
+	this.storage = storage? new storage(this.world.W * this.world.H): null;
+	this.occupied = storage? null: {};
 };
 Layer.prototype = {
 	get: function(pos) {
-			return this.occupied[this.world.encode_pos(pos)];
+			if (this.storage) {
+				return this.storage[this.world.encode_pos(pos)];
+			} else {
+				return this.occupied[this.world.encode_pos(pos)];
+			}
 		},
 	set: function(pos, value) {
 			var idx = this.world.encode_pos(pos);
 			if (value) {
-				this.occupied[idx] = value;
+				if (this.storage) {
+					this.storage[idx] = value;
+				} else {
+					this.occupied[idx] = value;
+				}
 				if (this.palette) {
 					this.ctx.fillStyle = this.palette(value);
 					this.ctx.fillRect(pos[0], pos[1], 1, 1);
 				}
 			} else {
-				delete this.occupied[idx];
+				if (this.storage) {
+					this.storage[idx] = 0;
+				} else {
+					delete this.occupied[idx];
+				}
 				if (this.palette) {
 					this.ctx.clearRect(pos[0], pos[1], 1, 1);
 				}
@@ -54,21 +74,24 @@ Layer.prototype = {
 };
 
 function World(W, H) {
-	console.assert(this instanceof World, this);
+	assert(this instanceof World, this);
 	this.W = W;
 	this.H = H;
 	this.nest = new Layer(this, BooleanPalette("rgba(0,0,0,0)", "rgba(0,0,255,1)"));
 	this.ants = new Layer(this, BooleanPalette("rgba(0,0,0,0)", "rgba(255,255,255,1)"));
-	this.food = new Layer(this, BooleanPalette("rgba(0,0,0,0)", "rgba(255,0,0,1)"));
+	this.foraging = new Layer(this, BooleanPalette("rgba(0,0,0,0)", "rgba(200,200,255,1)"), window.Uint8Array);
+	this.returning = new Layer(this, BooleanPalette("rgba(0,0,0,0)", "rgba(200,255,200,1)"), window.Uint8Array);
+	this.food = new Layer(this, BooleanPalette("rgba(0,0,0,0)", "rgba(255,0,0,1)"), window.Uint16Array);
 	this.pheromone_food_max = 3;
-	this.pheromone_food = new Layer(this, AlphaPalette(255, 0, 255, 0.75, this.pheromone_food_max));
+	this.pheromone_food = new Layer(this, AlphaPalette(255, 0, 255, 0.75, this.pheromone_food_max), window.Float32Array);
 	this.pheromone_nest_max = 3;
-	this.pheromone_nest = new Layer(this, AlphaPalette(255, 255, 0, 0.75, this.pheromone_nest_max));
+	this.pheromone_nest = new Layer(this, AlphaPalette(255, 255, 0, 0.75, this.pheromone_nest_max), window.Float32Array);
+	this.dropped = 0;
 };
 World.prototype = {
 	encode_pos: function(pos) {
 			var x = pos[0], y = pos[1];
-			console.assert(x >= 0 && x < this.W && y >= 0 && y < this.H, pos);
+			assert(x >= 0 && x < this.W && y >= 0 && y < this.H, pos);
 			return y * this.W + x;
 		},
 	decode_pos: function(serialized) {
@@ -77,13 +100,9 @@ World.prototype = {
 			pos[0] = serialized - (pos[1] * this.W);
 			return pos;
 		},
-	dist_score: function(a, b) {
-			if (!a || !b)
-				return 0;
-			var x = a[0] - b[0], y = a[1] - b[1];
-			return (x * x + y * y) + Math.random(); // sqrd dist
-		},
 	step: function() {
+			this.age_pheromone(this.pheromone_food);
+			this.age_pheromone(this.pheromone_nest);
 			for (var ant in this.ants.occupied) {
 				ant = this.ants.occupied[ant];
 				if (ant.food) {
@@ -92,8 +111,33 @@ World.prototype = {
 					ant.seek_food(); 
 				}
 			}
-			this.age_pheromone(this.pheromone_food);
-			this.age_pheromone(this.pheromone_nest);
+			if (this.dropped) {
+				for (var idx in this.nest.occupied) {
+					var pos = this.decode_pos(idx);
+					var amount = this.food.get(pos);
+					while (amount > 3) {
+						var x = pos[0], y = pos[1], loc = [0, 0];
+						var DIR = Ant.prototype.DIR, dir, create = false;
+						for (dir = DIR.length; dir --> 0; ) {
+							loc[0] = x + DIR[dir][0];
+							loc[1] = y + DIR[dir][1];
+							if (!this.ants.get(loc)) {
+								create = true;
+								break;
+							}
+						}
+						if (create) {
+							console.log("creating new ant at " + loc);
+							new Ant(this, dir, loc[0], loc[1]);
+							amount -= 3;
+							this.food.set(pos, amount);
+						} else {
+							break;
+						}
+					}
+				}
+				this.dropped = 0;
+			}
 		},
 	age_pheromone: function(pheromone) {
 			var next = {}, faded = [], phem, count = 0;
@@ -110,20 +154,21 @@ World.prototype = {
 				pheromone.set(this.decode_pos(faded[phem]), 0);
 			}
 			pheromone.occupied = next;
-		},		
+		},
 };
 
 function Ant(world, dir, x, y) {
-	console.assert(this instanceof Ant, this);
-	console.assert(world instanceof World, world);
+	assert(this instanceof Ant, this);
+	assert(world instanceof World, world);
 	this.world = world;
 	this.dir = dir;
 	this.pos = [x, y];
 	this.food = false;
 	this.age = 0;
 	this.history = {};
-	console.assert(!this.world.ants.get(this.pos));
+	assert(!this.world.ants.get(this.pos));
 	this.world.ants.set(this.pos, this);
+	this.world.foraging.set(this.pos, 1);
 }
 Ant.prototype = {
 	DIR: [[0, -1], [1, -1], [1, 0], [1,  1], [0,  1], [-1,  1], [-1, 0], [-1, -1]],
@@ -133,28 +178,44 @@ Ant.prototype = {
 	turn_left: function() { this.turn(-1); },
 	turn_right: function() { this.turn(1); },
 	move_forward: function() {
-			console.assert(this.world.ants.get(this.pos) == this);
-			this.world.ants.set(this.pos, null);
-			this.history[this.pos[1] * this.world.W + this.pos[0]] = this.age++;
+			var world = this.world;
+			var map = this.food? world.returning: world.foraging;
+			assert(world.ants.get(this.pos) == this);
+			world.ants.set(this.pos, null);
+			assert(map.get(this.pos));
+			map.set(this.pos, 0);
+			this.history[this.pos[1] * world.W + this.pos[0]] = this.age++;
 			var delta = this.DIR[this.dir];
-			this.pos[0] = Math.min(Math.max(this.pos[0] + delta[0], 0), this.world.W-1);
-			this.pos[1] = Math.min(Math.max(this.pos[1] + delta[1], 0), this.world.H-1);
-			console.assert(!this.world.ants.get(this.pos));
-			this.world.ants.set(this.pos, this);
+			this.pos[0] = Math.min(Math.max(this.pos[0] + delta[0], 0), world.W-1);
+			this.pos[1] = Math.min(Math.max(this.pos[1] + delta[1], 0), world.H-1);
+			assert(!world.ants.get(this.pos));
+			world.ants.set(this.pos, this);
+			assert(!map.get(this.pos));
+			map.set(this.pos, 1);
 		},
 	drop_food: function() {
-			console.assert(this.food);
-			this.world.food.set(this.pos, (this.world.food.get(this.pos) || 0) + 1);
+			var world = this.world;
+			assert(this.food);
+			world.food.set(this.pos, (world.food.get(this.pos) || 0) + 1);
 			this.food = false;
-			this._mark_trail(world.nest, world.pheromone_nest, world.pheromone_nest_max);
+			assert(!world.foraging.get(this.pos));
+			world.foraging.set(this.pos, 1);
+			assert(world.returning.get(this.pos));
+			world.returning.set(this.pos, 0);
+			world.dropped++;
 		},
 	take_food: function() {
-			console.assert(!this.food);
-			var food = this.world.food.get(this.pos);
-			console.assert(food, this.pos);
-			this.world.food.set(this.pos, food - 1);
+			var world = this.world;
+			assert(!this.food);
+			var food = world.food.get(this.pos);
+			assert(food, this.pos);
+			world.food.set(this.pos, food - 1);
 			this.food = true;
 			this._mark_trail(world.food, world.pheromone_food, world.pheromone_food_max);
+			assert(world.foraging.get(this.pos));
+			world.foraging.set(this.pos, 0);
+			assert(!world.returning.get(this.pos));
+			world.returning.set(this.pos, 1);
 		},
 	_mark_trail: function(target, pheromone, max) {
 			var world = this.world;
@@ -199,7 +260,11 @@ Ant.prototype = {
 	ahead: function() { return this.neighbour(this.dir); },
 	seek_food: function() {
 			var pos = this.pos, ahead = this.ahead(), world = this.world;
-			if (world.food.get(pos) && !world.nest.get(pos)) {
+			var nest = world.nest.get(pos);
+			if (nest) {
+				this._mark_trail(world.nest, world.pheromone_nest, world.pheromone_nest_max);
+			}
+			if (world.food.get(pos) && !nest) {
 				this.take_food();
 			} else if (ahead && world.food.get(ahead) && !world.nest.get(ahead) && !world.ants.get(ahead)) {
 				this.move_forward();
@@ -219,7 +284,8 @@ Ant.prototype = {
 		},
 	_seek: function(target, pheromone, max) {
 			var world = this.world;
-			var nearby = new Array(5), ahead = 2, can_move = false, i;
+			var nearby = new Array(5), ahead = 2;
+			var can_move = false, i;
 			for (i = nearby.length; i --> 0; ) {
 				nearby[i] = this.neighbour(this.dir - (ahead - i));
 				can_move = can_move || nearby[i];
@@ -230,20 +296,33 @@ Ant.prototype = {
 			}
 			if (nearby[ahead] && world.ants.get(nearby[ahead])) {
 				nearby[ahead] = null;
+				if (this.food) { // check to see if circumstances are right to create a new nest...
+					var x = this.pos[0], y = this.pos[1], DIR = this.DIR, count = 0;
+					if (x > 0 && x < world.W - 1 && y > 0 && y < world.H - 1) {
+						for (i = DIR.length; i --> 0; count++) {
+							if (!world.returning.get([x + DIR[i][0], y + DIR[i][1]]))
+								break;
+						}
+					}
+					if (count == DIR.length) {
+						console.log("CREATING new nest at", this.pos);
+						world.nest.set(this.pos, 1);
+					}
+				}
 			}
 			var candidates = new Array(nearby.length), i;
 			for (i = nearby.length; i --> 0; ) {
 				candidates[i] = 0;
 				if (nearby[i]) {
 					candidates[i] += target.get(nearby[i])? max: 0; // favour real target over pheromone
-					candidates[i] += (pheromone.get(nearby[i]) || 0); // * (ahead - Math.abs(i - ahead)); // favour ahead
+					candidates[i] += pheromone.get(nearby[i]) || 0;
 				}
 			}
 			var max = Math.max.apply(null, candidates);
 			if (!max) { // nowhere tempting?  favour going forwards
 				for (i = nearby.length; i --> 0; ) {
 					if (nearby[i]) {
-						candidates[i] = Math.random() * (ahead - Math.abs(i - ahead)); // favour ahead
+						candidates[i] = (i == ahead? 3: 1); // favour ahead
 						max = Math.max(max, candidates[i]);
 					}
 				}
@@ -256,15 +335,19 @@ Ant.prototype = {
 				target += candidates[i];
 			}
 			target *= Math.random();
-			var dirs = [this.turn_left, this.turn_left, this.move_forward, this.turn_right, this.turn_right];
 			for (i = nearby.length; i --> 0; ) {
 				if (nearby[i] && candidates[i] >= target) {
-					dirs[i].apply(this);
+					if (i < ahead)
+						this.turn_left();
+					else if (i > ahead)
+						this.turn_right();
+					else
+						this.move_forward();
 					return;
 				}
 				target -= candidates[i];
 			}
-			console.assert(!"off end of roulette!", nearby, candidates);
+			assert(!"off end of roulette!", nearby, candidates);
 		},
 };
 
