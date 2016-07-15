@@ -79,7 +79,11 @@ function init() {
 	world.food.set([100, 80], 1000);
 	world.food.set([10, 80], 1000);
 	for (var i=100; i-->0; ) {
-		new Ant(world, 0, parseInt(Math.random() * world.W), parseInt(Math.random() * world.H));
+		var x = (Math.random() * world.W) | 0;
+		var y = (Math.random() * world.H) | 0;
+		if (!world.ants.get([x, y])) {
+			new Ant(world, 0, x, y);
+		}
 	}
 
 	main_canvas = document.getElementById("main-canvas");	
