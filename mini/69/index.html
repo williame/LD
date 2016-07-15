@@ -1,0 +1,99 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<title>Ant Attack!</title>
+
+<!-- https://github.com/williame/LD/mini/69
+This is my Ludum Dare mini69 "colonisation" entry.
+
+Its a quick made-in-10-mins game with an ant colony simulation and a player
+can kill ants, which is presumably satisfying?
+
+BSD LICENSE:
+
+Copyright (c) 2016, William Edwards
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+    * Redistributions of source code must retain the above copyright
+      notice, this list of conditions and the following disclaimer.
+    * Redistributions in binary form must reproduce the above copyright
+      notice, this list of conditions and the following disclaimer in the
+      documentation and/or other materials provided with the distribution.
+    * Neither the name of the <organization> nor the
+      names of its contributors may be used to endorse or promote products
+      derived from this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL <COPYRIGHT HOLDER> BE LIABLE FOR ANY
+DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. -->
+
+<style type="text/css">
+body { border:0px;margin:0px;padding:0px; background-color: black; color: white; }
+.error { float: top; background: yellow; color: red; margin: 2px; padding: 2px; font-size: x-large; }
+#main-canvas { width:100%; height:100%; border:0px; margin:0px; padding:0px; }
+</style>
+
+<script type="text/javascript" src="sim.js"></script>
+<script type="text/javascript">
+
+var main_canvas, last_tick, speed = 100;
+
+function draw() {
+	var ctx = main_canvas.getContext("2d");
+	ctx.clearRect(0, 0, main_canvas.width, main_canvas.height);
+	ctx.drawImage(world.pheremone_nest.img, 0, 0, main_canvas.width, main_canvas.height);
+	ctx.drawImage(world.pheremone_food.img, 0, 0, main_canvas.width, main_canvas.height);
+	ctx.drawImage(world.food.img, 0, 0, main_canvas.width, main_canvas.height);
+	ctx.drawImage(world.nest.img, 0, 0, main_canvas.width, main_canvas.height);
+	ctx.drawImage(world.ants.img, 0, 0, main_canvas.width, main_canvas.height);
+}
+
+function render() {
+	requestAnimationFrame(render);
+	var elapsed = Date.now() - last_tick;
+	while (elapsed > speed) {
+		world.step();
+		elapsed -= speed;
+		last_tick += speed;
+	}
+	draw();
+}
+
+function init() {
+	world = new World(128, 128);
+	world.nest.set([30, 30], 1);
+	world.food.set([100, 80], 1000);
+	world.food.set([10, 80], 1000);
+	for (var i=100; i-->0; ) {
+		new Ant(world, 0, parseInt(Math.random() * world.W), parseInt(Math.random() * world.H));
+	}
+
+	main_canvas = document.getElementById("main-canvas");	
+	window.onresize = function(evt) {
+		main_canvas.style.height = (window.innerHeight - main_canvas.offsetTop)+"px";
+		main_canvas.width = window.fixedWidth || main_canvas.offsetWidth;
+		main_canvas.height = window.fixedHeight || main_canvas.offsetHeight;
+		draw();
+	};
+	window.onresize();
+	last_tick = Date.now();
+	requestAnimationFrame(render);
+}
+</script>
+</head>
+<body onload="init()">
+<canvas id="main-canvas" moz-opaque>
+<div class="error">Sorry, your browser doesn't support canvas :(</div>
+</canvas>
+</body>
+</html>
