@@ -39,7 +39,7 @@ if __name__=="__main__":
     opts, args = getopt.getopt(sys.argv[1:],"",
         ("ld-num=","algo=","target-image=","thumb-width=","patch-width=","skip-json=","comp="))
     opts = dict(opts)
-    ld_num = int(opts.get("--ld-num","33"))
+    ld_nums = opts.get("--ld-num","33")
     algo = opts.get("--algo","kuhn-munkres")
     save_json = int(opts.get("--save-json","1"))
     if algo not in ("greedy","timed","test","kuhn-munkres"):
@@ -55,27 +55,33 @@ if __name__=="__main__":
         target_filename = None
     
     # thumbs not already downloaded?
-    index_file = "%d/games.json"%ld_num 
-    if not os.path.exists(index_file):
-        index = scrape_ld.scrape_ld(ld_num)
-        with open(index_file,"w") as out:
-            json.dump(index,out)
-    else:
-        # load the index
-        with open(index_file) as index:
-            index = json.load(index)
+    index = []
+    try: os.makedirs(ld_nums)
+    except IOError: pass
+    for ld_num in map(int, ld_nums.split(",")):
+        index_file = "%d/games.json"%ld_num 
+        if not os.path.exists(index_file):
+            ld_index = scrape_ld.scrape_ld(ld_num)
+            with open(index_file,"w") as out:
+                json.dump(ld_index,out)
+            index.extend(ld_index)
+        else:
+            # load the index
+            with open(index_file) as ld_index:
+                index.extend(json.load(ld_index))
+    del ld_num
      
     # open all the images
     if comp != "all":
         index = [item for item in index if item[6] == (comp == "jam")]
     games = filter(lambda x: x.img,map(Game,index))
-    print "loaded %d games for ld %d"%(len(games),ld_num)
+    print "loaded %d games for ld %s"%(len(games), ld_nums)
  
     # load the target image
     target_imagename = opts.get("--target-image","mona_lisa.jpg")
     target = Image.open(os.path.expanduser(target_imagename))
     print "target image %s is %dx%d"%(target_imagename,target.size[0],target.size[1])
-    target_prefix = "%d/%s" % (ld_num, os.path.splitext(os.path.basename(target_imagename))[0])
+    target_prefix = "%s/%s" % (ld_nums, os.path.splitext(os.path.basename(target_imagename))[0])
     
     # work out target size
     thumb_aspect = sum(game.aspect for game in games) / len(games)
@@ -168,7 +174,7 @@ if __name__=="__main__":
         if save_json > 0:
             print "saving %s.idx.json"%target_pre
             json.dump({game.uid:game.placed for game in games},open("%s.idx.json"%target_pre,"w"))
-        print "URL: LD/Mosaic/index.html?ld=%d&img=%s&tw=%d&th=%d" % (ld_num, target_pre[len(str(ld_num))+1:], thumb_w, thumb_h)
+        print "URL: LD/Mosaic/index.html?ld=%s&img=%s&tw=%d&th=%d" % (ld_nums, target_pre[len(ld_nums)+1:], thumb_w, thumb_h)
     
     # place them
     print "%s placement:" % algo
