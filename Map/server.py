@@ -73,8 +73,9 @@ def _add_to_log(level,ctx,fmt,*args,**kwargs):
 class BaseHandler(tornado.web.RequestHandler):
     def initialize(self):
         O = self.request.headers.get("Origin")
-        OA = O if self.is_test() else "williame.github.io"
+        OA = O if self.is_test() else "http://williame.github.io"
         if not self.is_test() and O != OA:
+            self.log_warning("bad origin: %s" % O)
             raise tornado.web.HTTPError(403) # if you fork, get your own server!
         self.set_header("Access-Control-Allow-Origin", OA)
         self.set_header("Access-Control-Allow-Credentials", "true")

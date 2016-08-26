@@ -112,7 +112,7 @@ function init() {
 	while (tokens = re.exec(qs)) {
 		params[decodeURIComponent(tokens[1])] = decodeURIComponent(tokens[2]);
 	}
-	ld = parseInt(params["ld"]) || 32;
+	ld = params["ld"] || 32;
 	var m = {
 		path: ld + "/" + params["img"],
 		thumb_width: params["tw"],
