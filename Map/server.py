@@ -72,13 +72,13 @@ def _add_to_log(level,ctx,fmt,*args,**kwargs):
 
 class BaseHandler(tornado.web.RequestHandler):
     def initialize(self):
-        O = self.request.headers.get("Origin")
-        OA = O if self.is_test() else "http://williame.github.io"
-        if not self.is_test() and O != OA:
-            self.log_warning("bad origin: %s" % O)
+        origin = self.request.headers.get("Origin")
+        if self.is_test() or origin in ("http://williame.github.io", "https://williame.github.io"):
+            self.set_header("Access-Control-Allow-Origin", origin)
+            self.set_header("Access-Control-Allow-Credentials", "true")
+        else:
+            self.log_warning("bad origin: %s" % origin)
             raise tornado.web.HTTPError(403) # if you fork, get your own server!
-        self.set_header("Access-Control-Allow-Origin", OA)
-        self.set_header("Access-Control-Allow-Credentials", "true")
     def is_test(self):
         return self.request.remote_ip == "::1"
     def get_current_user(self):
