@@ -198,7 +198,7 @@ function wizard_start(resp) {
 			}
 			wizard.innerHTML = '<form onsubmit="try { wizard_user_name(this) } catch(error) { window.onerror(error); }; return false">' +
 				'Please enter your Ludum Dare username: ' +
-				'<input type="text" id="user_name"/>' + msg + '</form>' +
+				'<input type="text" id="user_name" name="user_name"/>' + msg + '</form>' +
 				'<small><u style="cursor: pointer" onclick="play()">I\'d like to browse the map anonymously, thanks</u> / ' +
 						'<u style="cursor: help" onclick="wizard_privacy()">privacy info</u>';
 			document.getElementById("user_name").focus();
@@ -238,7 +238,7 @@ function wizard_start(resp) {
 }
 
 function wizard_user_name(form) {
-	user_name = document.getElementById("user_name").value;
+	user_name = form["user_name"].value;
 	api("login", wizard_start, JSON.stringify({"user_name": user_name}), "POST");
 }
 
