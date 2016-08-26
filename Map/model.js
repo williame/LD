@@ -238,7 +238,7 @@ function wizard_start(resp) {
 }
 
 function wizard_user_name(form) {
-	user_name = form.elements["user_name"].value;
+	user_name = document.getElementById("user_name").value;
 	api("login", wizard_start, JSON.stringify({"user_name": user_name}), "POST");
 }
 
