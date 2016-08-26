@@ -82,7 +82,6 @@ function update_feedback_friends_feed(cb) {
 		if (doc.readyState==4 && (!doc.status || doc.status==200)) {
 			window.entries = JSON.parse(doc.response);
 			update_map();
-			render();
 			cb();
 		}
 	};
@@ -532,6 +531,7 @@ function update_map() {
 			return a[1] - b[1];
 		});
 	}
+	redraw();
 }
 
 function update_camera() {
