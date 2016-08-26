@@ -138,7 +138,7 @@ var camera, img_map_topo, img_pin, lines_map, mode;
 function init() {
 	console.log("init...");
 	event_id = getParameterByName("event") || "ludum-dare-36";
-	debugging = "file:" === window.location.protocol || window.location.hostname == "localhost";
+	debugging = "file:" === window.location.protocol || window.location.hostname == "localhost" || getParameterByName("debugging");
 	server = (debugging? "localhost": "31.192.226.244") + ":28285"; //### my private server; if you fork, you have to change this
 	window.onerror = function(message, file, line, column, error) {
 		try {
