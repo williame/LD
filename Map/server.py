@@ -168,7 +168,7 @@ class LoginHandler(BaseHandler):
             uid = uid[0]
             db_cursor.execute("INSERT INTO users (uid, user_name) VALUES (?, ?)", (uid, self.user_name,))
             db_conn.commit()
-            user_name_to_uid[self.user_name.lower()] 
+            user_name_to_uid[self.user_name.lower()] = uid
             self.done(True)
         else:
             self.done(True, "you have not entered any games?")
