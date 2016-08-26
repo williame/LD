@@ -1,0 +1,221 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<title>The Ludum Dare Map</title>
+<link rel="shortcut icon" href="favicon.ico" type='image/x-icon'/>
+
+<!-- https://github.com/williame/LD/Map project
+
+BSD LICENSE:
+
+Copyright (c) 2016, William Edwards
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+    * Redistributions of source code must retain the above copyright
+      notice, this list of conditions and the following disclaimer.
+    * Redistributions in binary form must reproduce the above copyright
+      notice, this list of conditions and the following disclaimer in the
+      documentation and/or other materials provided with the distribution.
+    * Neither the name of the <organization> nor the
+      names of its contributors may be used to endorse or promote products
+      derived from this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL <COPYRIGHT HOLDER> BE LIABLE FOR ANY
+DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. -->
+
+<style type="text/css">
+body {
+	font-size: x-large;
+	font-family: Fantasy, 'Comic Sans', Serif;
+	text-shadow: -1px 0 black, 0 1px black, 1px 0 black, 0 -1px black;
+	border: 0px; margin: 0px; padding: 0px;
+	background-color: black; color: white; cursor: default;
+}
+.error {
+	float: top;
+	margin: 2px; padding: 2px;
+	background: yellow; color: red; }
+.bottom {
+	overflow: hidden;
+	position: fixed;
+	background-image: url(data/bottom_bg.png);
+	background-repeat: repeat-x;
+	padding: 10px; padding-top: 30px;
+	bottom: 0%;
+	width: 100%;
+}
+#info {
+	position: absolute;
+	font-size: large;
+	background-color: rgba(100, 200, 100, 0.4);
+	padding: 10px;
+	visibility: hidden;
+	border-radius: 15px;
+}
+.entry0 {
+	text-align: center;	
+	vertical-align: top;
+	background-color: rgba(150, 120, 130, 0.9);
+	padding: 7px;
+	border-radius: 5px;
+	cursor: pointer;
+}
+.entry1 {
+	text-align: center;
+	vertical-align: top;
+	background-color: rgba(130, 120, 150, 0.9);
+	padding: 7px;
+	border-radius: 5px;
+	cursor: pointer;
+}
+#menu_bar {
+	position: absolute;
+	background-color: rgba(100, 200, 100, 0.4);
+	margin: 3px;
+	padding: 3px;
+	visibility: hidden;
+	border-radius: 5px;
+	vertical-align: top;
+}
+.menu_bar_icon {
+	background-color: rgba(100, 200, 100, 0.4);
+	margin: 3px;
+	padding: 3px;
+	display: inline-block;
+	border-radius: 5px;
+	vertical-align: top;
+}
+#menu {
+	display: none;}
+#main-canvas {
+	width: 100%; height: 100%;
+	border: 0px; margin: 0px; padding: 0px;
+	background-color: red;
+}
+#modal {
+     visibility: hidden;
+     position: absolute;
+     left: 0px;
+     top: 0px;
+     width:100%;
+     height:100%;
+     text-align:center;
+     z-index: 1000;
+     background-color: rgba(0, 0, 0, 0.4);
+}
+#modal_dialog {
+     margin: 100px auto;
+     background-color: rgba(100, 0, 0, 0.9);
+     border:1px solid #000;
+     border-radius: 15px;
+     padding:15px;
+     display: inline-block;
+     text-align:center;
+}
+</style>
+
+<script type="text/javascript" src="model.js"></script>
+<script type="text/javascript" src="transform.js"></script>
+<script type="text/javascript">
+
+var debugging, server, canvas, wizard_div;
+var event_id;
+var user = {}, positions = {}, entries = [], known_entries = [], known_user_idx = -1;
+var selected, commented = {}, commenter = {};
+var camera, img_map_topo, img_pin, lines_map, mode;
+
+function init() {
+	console.log("init...");
+	event_id = getParameterByName("event") || "ludum-dare-36";
+	debugging = "file:" === window.location.protocol || window.location.hostname == "localhost";
+	server = (debugging? "localhost": "31.192.226.244") + ":28285"; //### my private server; if you fork, you have to change this
+	window.onerror = function(message, file, line, column, error) {
+		try {
+			if (!(error instanceof Error)) try {
+				throw new Error(JSON.stringify(arguments || []));
+			} catch(e) { error = e;}
+			console.log("error", error, "at", error.stack? error.stack: "?");
+			var doc = new XMLHttpRequest();
+			doc.open("POST", "http://" + server + "/api/report_error", true);
+			doc.overrideMimeType("text/plain");
+			doc.onerror = function(error) { console.log("could not report error:", error); };
+			doc.send(JSON.stringify({ error: error, stack: error.stack}));
+			if (!debugging) {
+				window.setTimeout(function() { window.location.reload(false); }, 2500);
+			}
+			var div = window.document.getElementById("error");
+			if (div && div.style.display == "none") {
+				div.innerHTML = "<b>AN ERROR OCCURRED</b><br/>" + error + "<br/><pre>" + error.stack;
+				div.style.display = "block";
+				}
+		} catch(error) {
+			console.log("Error in error handler:", error);
+		}
+	};
+	load_shapefile();
+	load_img("data/map1.jpg", function(img) {
+			window.img_map_topo = img;
+			update_camera();
+	});
+	load_img("data/pin.png", function(img) {
+		window.img_pin = PinFactory(img);
+		update_map();
+	});
+	canvas = document.getElementById("main-canvas");
+	window.onresize = function() {
+		canvas.style.height = (window.innerHeight - canvas.offsetTop)+"px";
+		canvas.width = canvas.offsetWidth;
+		canvas.height = canvas.offsetHeight;
+		update_camera();
+		render();
+	};
+	window.onresize();
+	wizard_div = document.getElementById("wizard");
+	wizard_start();
+	background_update();
+}
+</script>
+
+</head>
+<body onload="init()">
+<noscript>
+<div class="error">Sorry, you don't have Javascript enabled :(</div>
+</noscript>
+<div class="error" style="display: none" id="error"></div>
+<div class="error" style="position: fixed; display: none" id="privacy_info" onclick="wizard_privacy()">
+<center><u>PRIVACY INFO</u></center>
+You don't have to tell everyone where you live!<br/>
+You could choose to not say, or you could outright lie :)<br/>
+All the positions on this map have been volunteered by LDers<br/>
+for the very purpose of telling other LDers where they live.<br/>
+All this info is made publically available to everyone.<br/>
+<small>
+<span id="privacy_info_wipe"></span>
+<center><u style="cursor: pointer">got it!</u></center>
+</small>
+</div>
+<div id="info">info here</div>
+<div id="menu_bar">
+	<div class="menu_bar_icon" id="menu_zoom_in"><img src="data/zoom-in.png"/></div>
+	<div class="menu_bar_icon" id="menu_zoom_out"><img src="data/zoom-out.png"/></div>
+	<div class="menu_bar_icon" id="menu_zoom_fit"><img src="data/zoom-fit.png"/></div>
+	<div class="menu_bar_icon" id="menu_options"><img src="data/options.png"/><div id="menu"></div></div>
+</div>
+<canvas id="main-canvas" moz-opaque>
+<div class="error">Sorry, you don't have webGL enabled :(</div>
+</canvas>
+<div id="wizard" class="bottom">loading... please wait</div>
+<div id="modal"><div id="modal_dialog"></div></div>
+</body>
+</html>
