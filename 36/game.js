@@ -131,10 +131,12 @@ function start() {
 		mouse_pos = [evt.clientX, evt.clientY];
 		evt.preventDefault();
 	};
-	canvas.ontouchend = canvas.onmouseup = function(evt) {
+	canvas.ontouchend = canvas.ontouchcancel = canvas.onmouseup = function(evt) {
 		mouse_pos = [evt.clientX, evt.clientY];
 		evt.preventDefault();
 	};
+	canvas.setAttribute('tabindex','0');
+	canvas.focus();
 	start_time = now();
 }
 
