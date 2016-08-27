@@ -196,12 +196,7 @@ function wizard_start(resp) {
 			if (resp && resp.note) {
 				msg = " <i>(" + resp.note + ")</i>";
 			}
-			var disclaimer = "";
-			if (new Date() < new Date(2016, 8, 29) && event_id == "ludum-dare-36") {
-				disclaimer += '<b><em><u>Attention!</u></em></b>  The <a href="http://www.ludumdare.com/compo">LD#36 contest</a> is still ongoing!  So ... there won\'t be that many entries to show on the map just yet :)<br/>';
-				disclaimer += 'Check back as more and more entries are submitted to LD#36, or <u><a href="?event=ludum-dare-35">look at the LD#35 map</a></u> or ... just go ahead anyway :D<hr/>';
-			}
-			wizard.innerHTML = disclaimer + '<form onsubmit="try { wizard_user_name(this) } catch(error) { window.onerror(error); }; return false">' +
+			wizard.innerHTML = '<form onsubmit="try { wizard_user_name(this) } catch(error) { window.onerror(error); }; return false">' +
 				'Please enter your Ludum Dare username: ' +
 				'<input type="text" id="user_name" name="user_name"/>' + msg + '</form>' +
 				'<small><u style="cursor: pointer" onclick="play()">I\'d like to browse the map anonymously, thanks</u> / ' +
@@ -266,9 +261,10 @@ var last_position_update = 0;
 function update_positions(cb) {
 	api("positions?cursor=" + last_position_update, function(positions) {
 		var refresh = !!last_position_update, count = 0;
-		for (var author in positions) {
-			var pos = positions[author];
-			window.positions[author] = new LatLng(pos[0], pos[1]).to_mercator();
+		for (var uid in positions) {
+			var pos = positions[uid];
+			uid_to_name[uid] = pos[3];
+			window.positions[uid] = new LatLng(pos[0], pos[1]).to_mercator();
 			last_position_update = Math.max(last_position_update, pos[2]);
 			count++;
 		}
@@ -327,7 +323,6 @@ function zoom_map(factor) {
 }
 
 function centre_and_zoom_map_on_user() {
-	console.log("centreing on player");
 	if (user && user.position && (user.position.lat || user.position.lng)) {
 		console.log("zooming in on user");
 		centre_map(user.position.to_mercator());
@@ -420,7 +415,24 @@ function set_mode(mode) {
 			}
 			if (hit) {
 				selected = hit;
+				selected_ghosts = null;
 			} else {
+				if (!selected) {
+					// check for ghosts
+					for (var ghost in ghosts) {
+						ghost = ghosts[ghost];
+						var cmp = test(ghost);
+						if (cmp > 0)
+						break;
+						if (!cmp) {
+							hit = hit || {};
+							hit[ghost[2]] = ghost;
+						}
+					}
+					if (hit) {
+						selected_ghosts = hit;
+					}
+				}
 				// ok, drag instead
 				drag = camera.unproject(e.clientX, e.clientY);
 			}
@@ -510,8 +522,9 @@ function redraw() {
 function show_selection() {
 	var info = document.getElementById("info");
 	info.style.visibility = "hidden";
+	var html = "";
 	if (selected && mode == "play") {
-		var pos, count = 0, html = "";
+		var pos, count = 0;
 		for (var uid in selected) {
 			count++;
 			var entry = selected[uid];
@@ -525,7 +538,27 @@ function show_selection() {
 			if (entry.uid in commenter) html += "<hr/><em>Commented on you!</em>";
 			html += "</small></td>";
 		}
-		info.innerHTML = "<table><tr>" + html + "</tr></table>";
+		html = "<table><tr>" + html + "</tr></table>";
+	} else if (selected_ghosts && mode == "play") {
+		var pos, count = 0;
+		for (var uid in selected_ghosts) {
+			var ghost = selected_ghosts[uid];
+			pos = pos || camera.project(ghost[0], ghost[1]);
+			if (count++) html += ", ";
+			html += '<span class="entry' + (count&1) + '">' + ghost[3] + "</span>";
+		}
+		html += "<hr/>";
+		if (count == 1) {
+			html += "hasn't submitted a game";
+		} else {
+			html += " have not submitted any games";
+		}
+		if (event_id == "ludum-dare-36" && new Date() < new Date(2016, 8, 30)) {
+			html += " yet!<br/>Maybe check back later?";
+		}
+	}
+	if (html && pos[0] >= 0 && pos[1] >= 0 && pos[0] < canvas.width && pos[1] < canvas.height) {
+		info.innerHTML = html;
 		var x = Math.max(0, pos[0] - (info.clientWidth / 2));
 		if (x + info.clientWidth > canvas.width) x = canvas.width - info.clientWidth;
 		var y = pos[1] - 40 - info.clientHeight;
@@ -540,6 +573,7 @@ function update_map() {
 	if (entries && positions && img_pin) {
 		known_user_idx = -1;
 		known_entries = [];
+		var used = {};
 		for (var entry in entries) {
 			entry = entries[entry];
 			var pos = positions[entry.uid];
@@ -554,13 +588,23 @@ function update_map() {
 				if (entry.uid == user.uid)
 					known_user_idx = known_entries.length;
 				known_entries.push([pos[0], pos[1], entry]);
+				used[entry.uid] = 1;
 			}
 		}
-		known_entries.sort(function (a, b) { //Z-sort
+		var zsort = function (a, b) {
 			if (a[1] == b[1])
 				return a[0] - b[0];
 			return a[1] - b[1];
-		});
+		};
+		known_entries.sort(zsort);
+		ghosts = [];
+		for (var uid in positions) {
+			if (!(uid in used)) {
+				var pos = positions[uid];
+				ghosts.push([pos[0], pos[1], uid, uid_to_name[uid] || uid]);
+			}
+		}
+		ghosts.sort(zsort);
 	}
 	redraw();
 }
@@ -598,6 +642,17 @@ function render() {
 			}
 		}
 		ctx.stroke();
+	}
+	if (mode == "play") {
+		for (var ghost in ghosts) {
+			ghost = ghosts[ghost];
+			var pin =
+				selected_ghosts && ghost[2] in selected_ghosts? "white":
+				"rgba(230,250,240,0.3)";
+			pin = img_pin(pin);
+			var pos = camera.project(ghost[0], ghost[1]);
+			ctx.drawImage(pin, pos[0] - pin.width / 2, pos[1] - pin.height);
+		}
 	}
 	if (user && user.position && (user.position.lat || user.position.lng) && img_pin) {
 		var pos = user.position.to_mercator();

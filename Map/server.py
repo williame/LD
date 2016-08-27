@@ -54,8 +54,8 @@ def db_init(path):
     for uid, user_name in db_cursor.execute("SELECT uid, user_name FROM users").fetchall():
         user_name_to_uid[user_name.lower()] = uid
     positions, now = {}, int(time.time())
-    for uid, lat, lng in db_cursor.execute("SELECT uid, lat, lng FROM users WHERE lat IS NOT NULL AND lng IS NOT NULL").fetchall():
-        positions[uid] = [lat, lng, now]
+    for uid, user_name, lat, lng in db_cursor.execute("SELECT uid, user_name, lat, lng FROM users WHERE lat IS NOT NULL AND lng IS NOT NULL").fetchall():
+        positions[uid] = [lat, lng, now, user_name]
 db_init("ld_map.db")
 
 options.define("port",default=28285,type=int)

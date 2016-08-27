@@ -133,8 +133,8 @@ body {
 
 var debugging, server, canvas, wizard_div;
 var event_id;
-var user = {}, positions = {}, entries = [], known_entries = [], known_user_idx = -1;
-var selected, commented = {}, commenter = {};
+var user = {}, positions = {}, entries = [], known_entries = [], known_user_idx = -1, ghosts = [];
+var selected, selected_ghosts, commented = {}, commenter = {}, uid_to_name = {};
 var camera, img_map_topo, img_pin, lines_map, mode;
 
 function init() {
