@@ -124,15 +124,18 @@ var start_time, mouse_pos;
 
 function start() {
 	canvas.ontouchstart = canvas.onmousedown = function(evt) {
-		mouse_pos = [evt.clientX, evt.clientY];
+		var pos = evt.touches? evt.touches[0]: evt;
+		mouse_pos = [pos.clientX, pos.clientY];
 		evt.preventDefault();
 	};
 	canvas.ontouchmove = canvas.onmousemove = function(evt) {
-		mouse_pos = [evt.clientX, evt.clientY];
+		var pos = evt.touches? evt.touches[0]: evt;
+		mouse_pos = [pos.clientX, pos.clientY];
 		evt.preventDefault();
 	};
-	canvas.ontouchend = canvas.ontouchcancel = canvas.onmouseup = function(evt) {
-		mouse_pos = [evt.clientX, evt.clientY];
+	canvas.ontouchstop = canvas.ontouchcancel = canvas.onmouseup = function(evt) {
+		var pos = evt.touches? evt.touches[0]: evt;
+		mouse_pos = [pos.clientX, pos.clientY];
 		evt.preventDefault();
 	};
 	canvas.setAttribute('tabindex','0');
