@@ -483,7 +483,7 @@ function set_mode(mode) {
 		keys[e.key] = false;
 	};
 	canvas.onmousewheel = function(e, delta) {
-		zoom_map(delta * 0.001);
+		zoom_map(1 + (delta * 0.001));
 		redraw();
 	};
 	canvas.setAttribute('tabindex','0');
