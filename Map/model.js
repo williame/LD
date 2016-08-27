@@ -500,7 +500,8 @@ function set_mode(mode) {
 	if (user && user.position && (user.position.lat || user.position.lng))
 		html += '<button onclick="forget()">forget my location</button><br/>';
 	html += '<button onclick="logout()">logout ' + user.user_name + '</button><br/>';
-	html += '<button onclick="wizard_privacy()">privacy info</button>';
+	html += '<button onclick="wizard_privacy()">privacy info</button><br/>';
+	html += '<button onclick="window.location = \'http://ludumdare.com/compo/2016/08/27/the-ld-map-is-live/\'">feedback and bugs</button>';
 	menu.innerHTML = html;
 	menu_options.addEventListener('mouseenter', function(e) {
 		menu.style.display = "inline";
