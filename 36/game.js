@@ -125,12 +125,15 @@ var start_time, mouse_pos;
 function start() {
 	canvas.ontouchstart = canvas.onmousedown = function(evt) {
 		mouse_pos = [evt.clientX, evt.clientY];
+		evt.preventDefault();
 	};
 	canvas.ontouchmove = canvas.onmousemove = function(evt) {
 		mouse_pos = [evt.clientX, evt.clientY];
+		evt.preventDefault();
 	};
 	canvas.ontouchend = canvas.onmouseup = function(evt) {
 		mouse_pos = [evt.clientX, evt.clientY];
+		evt.preventDefault();
 	};
 	start_time = now();
 }
