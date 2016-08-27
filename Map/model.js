@@ -199,7 +199,7 @@ function wizard_start(resp) {
 			var disclaimer = "";
 			if (new Date() < new Date(2016, 8, 29) && event_id == "ludum-dare-36") {
 				disclaimer += '<b><em><u>Attention!</u></em></b>  The <a href="http://www.ludumdare.com/compo">LD#36 contest</a> is still ongoing!  So ... there won\'t be that many entries to show on the map just yet :)<br/>';
-				disclaimer += 'Check back as more and more entries are submitted to LD#36, or <u><a href="?event=ludum-dare-35">look at the LD#35 map</a></u>.<hr/>';
+				disclaimer += 'Check back as more and more entries are submitted to LD#36, or <u><a href="?event=ludum-dare-35">look at the LD#35 map</a></u> or ... just go ahead anyway :D<hr/>';
 			}
 			wizard.innerHTML = disclaimer + '<form onsubmit="try { wizard_user_name(this) } catch(error) { window.onerror(error); }; return false">' +
 				'Please enter your Ludum Dare username: ' +
