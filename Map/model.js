@@ -196,7 +196,12 @@ function wizard_start(resp) {
 			if (resp && resp.note) {
 				msg = " <i>(" + resp.note + ")</i>";
 			}
-			wizard.innerHTML = '<form onsubmit="try { wizard_user_name(this) } catch(error) { window.onerror(error); }; return false">' +
+			var disclaimer = "";
+			if (new Date() < new Date(2016, 8, 29) && event_id == "ludum-dare-36") {
+				disclaimer += '<b><em><u>Attention!</u></em></b>  The <a href="http://www.ludumdare.com/compo">LD#36 contest</a> is still ongoing!  So ... there won\'t be that many entries to show on the map just yet :)<br/>';
+				disclaimer += 'Check back as more and more entries are submitted to LD#36, or <u><a href="?event=ludum-dare-35">look at the LD#35 map</a></u>.<hr/>';
+			}
+			wizard.innerHTML = disclaimer + '<form onsubmit="try { wizard_user_name(this) } catch(error) { window.onerror(error); }; return false">' +
 				'Please enter your Ludum Dare username: ' +
 				'<input type="text" id="user_name" name="user_name"/>' + msg + '</form>' +
 				'<small><u style="cursor: pointer" onclick="play()">I\'d like to browse the map anonymously, thanks</u> / ' +
