@@ -123,13 +123,13 @@ var things = [
 var start_time, mouse_pos;
 
 function start() {
-	canvas.onmousedown = function(evt) {
+	canvas.ontouchstart = canvas.onmousedown = function(evt) {
 		mouse_pos = [evt.clientX, evt.clientY];
 	};
-	canvas.onmousemove = function(evt) {
+	canvas.ontouchmove = canvas.onmousemove = function(evt) {
 		mouse_pos = [evt.clientX, evt.clientY];
 	};
-	canvas.onmouseup = function(evt) {
+	canvas.ontouchend = canvas.onmouseup = function(evt) {
 		mouse_pos = [evt.clientX, evt.clientY];
 	};
 	start_time = now();
