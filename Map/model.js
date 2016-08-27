@@ -189,6 +189,7 @@ function background_update(forced) {
 function wizard_start(resp) {
 	if (resp) console.log("login resp:", resp);
 	api("user", function(user) {
+		console.log("got user:", user);
 		window.user = user;
 		if (!user.user_name) {
 			var msg = "";
@@ -202,6 +203,7 @@ function wizard_start(resp) {
 						'<u style="cursor: help" onclick="wizard_privacy()">privacy info</u>';
 			document.getElementById("user_name").focus();
 		} else if (!user.position || (!user.position.lat && !user.position.lng)) {
+			console.log("user has no position", user);
 			api("geoip", function(geoip) {
 					console.log("geoip", geoip);
 					var city = (geoip.city || geoip.region_name || "");
@@ -212,8 +214,7 @@ function wizard_start(resp) {
 						if (geoip.latitude || geoip.longitude) {
 							user.position = new LatLng(geoip.latitude, geoip.longitude);
 							console.log("geoip", user.position);
-							centre_map(user.position.to_mercator());
-							zoom_map(10000); // zoom in as much as it lets us
+							centre_and_zoom_map_on_user();
 							near += "Zoom in, drag it around and, when you are happy, " +
 								'<b><u><a onclick="play()" style="cursor: pointer;">click here to continue!</a></u></b>';
 						}
@@ -229,6 +230,7 @@ function wizard_start(resp) {
 			wizard.innerHTML = 'We are trying to guess where you may be... :)';
 		} else if (user.position && (user.position.lat || user.position.lng)) {
 			user.position = new LatLng(user.position.lat, user.position.lng);
+			centre_and_zoom_map_on_user();				
 			play();
 		} else {
 			wizard_set_position();
@@ -242,17 +244,31 @@ function wizard_user_name(form) {
 }
 
 function wizard_privacy() {
-	var privacy_info = document.getElementById("privacy_info");
-	privacy_info.style.display = privacy_info.style.display == "none"? "block": "none";
+	modal('<div onclick="modal()">' +
+		'<center><u>PRIVACY INFO</u></center>' +
+		'You don\'t really have to tell everyone where you live!<br/>' +
+		'You could choose to not say, or you could outright lie :)<br/>' +
+		'All the positions on this map have been volunteered by LDers for the<br/>' +
+		'very purpose of telling other LDers where they (pretend to) live.<br/>' +
+		'All this info is made publically available to everyone.<br/>' +
+		'<small>' +
+		'<span id="privacy_info_wipe"></span>' +
+		'<center><u style="cursor: pointer">got it!</u></center>' +
+		'</small></div>');
 }
 
 var last_position_update = 0;
 function update_positions(cb) {
 	api("positions?cursor=" + last_position_update, function(positions) {
+		var refresh = !!last_position_update, count = 0;
 		for (var author in positions) {
 			var pos = positions[author];
 			window.positions[author] = new LatLng(pos[0], pos[1]).to_mercator();
 			last_position_update = Math.max(last_position_update, pos[2]);
+			count++;
+		}
+		if (refresh && count) {
+			console.log("loaded " + count + " new positions");
 		}
 		update_map();
 		cb();
@@ -303,7 +319,16 @@ function zoom_map(factor) {
 		var new_centre = camera.unproject(canvas.width / 2, canvas.height / 2);
 		camera.translate(new_centre[0] - old_centre[0], new_centre[1] - old_centre[1]);
 	}
-};
+}
+
+function centre_and_zoom_map_on_user() {
+	console.log("centreing on player");
+	if (user && user.position && (user.position.lat || user.position.lng)) {
+		console.log("zooming in on user");
+		centre_map(user.position.to_mercator());
+		zoom_map(10000); // zoom in as much as it lets us
+	}
+}
 
 var pos_queue = [], set_position_first = true;
 function set_position(mercator) {
@@ -457,7 +482,8 @@ function set_mode(mode) {
 		html += '<button onclick="wizard_set_position(); set_mode(\'set_position\')">change my own location</button><br/>';
 	if (user && user.position && (user.position.lat || user.position.lng))
 		html += '<button onclick="forget()">forget my location</button><br/>';
-	html += '<button onclick="logout()">logout ' + user.user_name + '</button>';
+	html += '<button onclick="logout()">logout ' + user.user_name + '</button><br/>';
+	html += '<button onclick="wizard_privacy()">privacy info</button>';
 	menu.innerHTML = html;
 	menu_options.addEventListener('mouseenter', function(e) {
 		menu.style.display = "inline";
@@ -593,3 +619,5 @@ function render() {
 		}
 	}
 }
+
+

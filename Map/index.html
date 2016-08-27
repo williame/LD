@@ -45,7 +45,9 @@ body {
 .error {
 	float: top;
 	margin: 2px; padding: 2px;
-	background: yellow; color: red; }
+	background: yellow; color: red;
+	border-radius: 15px;
+}
 .bottom {
 	overflow: hidden;
 	position: fixed;
@@ -120,8 +122,8 @@ body {
      border:1px solid #000;
      border-radius: 15px;
      padding:15px;
-     display: inline-block;
      text-align:center;
+     display: inline-block;
 }
 </style>
 
@@ -174,7 +176,7 @@ function init() {
 	load_shapefile();
 	load_img("data/map1.jpg", function(img) {
 			window.img_map_topo = img;
-			update_camera();
+			render();
 	});
 	load_img("data/pin.png", function(img) {
 		window.img_pin = PinFactory(img);
@@ -201,18 +203,6 @@ function init() {
 <div class="error">Sorry, you don't have Javascript enabled :(</div>
 </noscript>
 <div class="error" style="display: none" id="error"></div>
-<div class="error" style="position: fixed; display: none" id="privacy_info" onclick="wizard_privacy()">
-<center><u>PRIVACY INFO</u></center>
-You don't have to tell everyone where you live!<br/>
-You could choose to not say, or you could outright lie :)<br/>
-All the positions on this map have been volunteered by LDers<br/>
-for the very purpose of telling other LDers where they live.<br/>
-All this info is made publically available to everyone.<br/>
-<small>
-<span id="privacy_info_wipe"></span>
-<center><u style="cursor: pointer">got it!</u></center>
-</small>
-</div>
 <div id="info">info here</div>
 <div id="menu_bar">
 	<div class="menu_bar_icon" id="menu_zoom_in"><img src="data/zoom-in.png"/></div>

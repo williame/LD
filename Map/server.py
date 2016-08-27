@@ -101,8 +101,8 @@ class BaseHandler(tornado.web.RequestHandler):
     def log_info(self,fmt,*args,**kwargs):
         self.log(logging.INFO,fmt,*args,**kwargs)
     def _request_summary(self):
-        return "%s %s (%s %s)" % (self.request.method, self.request.uri,
-            self.request.remote_ip, self.current_user) 
+        return "%s %s (%s %s %s)" % (self.request.method, self.request.uri,
+            self.request.remote_ip, self.current_user, self.get_secure_cookie("user_name")) 
         
 class GeoIPHandler(BaseHandler):
     @tornado.web.asynchronous
@@ -204,10 +204,10 @@ class SetPositionHandler(BaseHandler):
             lng = float(data["lng"])
             lat = float(data["lat"])
             self.log_info("setting position %s (%s) to %f,%f" % (user_name, uid, lat, lng))
-            db_cursor.execute("UPDATE users SET lat = NULL, lng = NULL WHERE user_name = ? COLLATE NOCASE", (user_name,))
+            db_cursor.execute("UPDATE users SET lat = ?, lng = ? WHERE user_name = ? COLLATE NOCASE", (lat, lng, user_name,))
             db_conn.commit()
             if uid:
-                positions[uid] = [None, None, time.time()]
+                positions[uid] = [lat, lng, time.time()]
         else:
             self.log_warning("cannot set position")
             
