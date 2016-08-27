@@ -402,6 +402,7 @@ function set_mode(mode) {
 					drag = [pos[0] - drag[0], pos[1] - drag[1]];
 			}
 		} else {
+			selected = selected_ghosts = null;
 			var hit = null;
 			for (var entry in known_entries) {
 				entry = known_entries[entry];
@@ -415,26 +416,24 @@ function set_mode(mode) {
 			}
 			if (hit) {
 				selected = hit;
-				selected_ghosts = null;
 			} else {
-				if (!selected) {
-					// check for ghosts
-					for (var ghost in ghosts) {
-						ghost = ghosts[ghost];
-						var cmp = test(ghost);
-						if (cmp > 0)
-						break;
-						if (!cmp) {
-							hit = hit || {};
-							hit[ghost[2]] = ghost;
-						}
-					}
-					if (hit) {
-						selected_ghosts = hit;
+				// check for ghosts
+				for (var ghost in ghosts) {
+					ghost = ghosts[ghost];
+					var cmp = test(ghost);
+					if (cmp > 0)
+					break;
+					if (!cmp) {
+						hit = hit || {};
+						hit[ghost[2]] = ghost;
 					}
 				}
-				// ok, drag instead
-				drag = camera.unproject(e.clientX, e.clientY);
+				if (hit) {
+					selected_ghosts = hit;
+				} else {
+					// ok, drag instead
+					drag = camera.unproject(e.clientX, e.clientY);
+				}
 			}
 			redraw();
 		}
