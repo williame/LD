@@ -354,7 +354,7 @@ function render() {
 					var hits = [];
 					var check = function(a, b) {
 						var hit = line_intersection(
-							arrow.pos[0], arrow.pos[1], arrow.last_pos[0], arrow.last_pos[0],
+							arrow.pos[0], arrow.pos[1], arrow.last_pos[0], arrow.last_pos[1],
 							a[0], a[1], b[0], b[1]);
 						if (hit)
 							hits.push(hit);
