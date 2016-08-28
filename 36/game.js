@@ -152,18 +152,21 @@ Thing.prototype = {
 		normal[0] *= (layer.y_scale * y_scaler) / layer.x_scale;
 		x = (x - x_ofs) * layer.x_scale;
 		ctx.strokeStyle = this.colour;
-		ctx.beginPath();
-		ctx.moveTo(x, y);
-		ctx.arc(x, y, 5, 0, Math.PI*2);
-		ctx.stroke();
+		if (debugging) {
+			ctx.beginPath();
+			ctx.moveTo(x, y);
+			ctx.arc(x, y, 5, 0, Math.PI*2);
+			ctx.stroke();
+		}
 		ctx.save();
 		ctx.translate(x, y);
 		ctx.rotate(Math.atan2(normal[1], normal[0]) + Math.PI * 1.5);
 		if (this.sprite && this.sprite.width) {
 			this.sprite.render(ctx, -this.width, -this.height, this.width, this.height, elapsed * 5);
+		} else {
+			ctx.rect(-this.width, -this.height, this.width, this.height);
+			ctx.stroke();
 		}
-		ctx.rect(-this.width, -this.height, this.width, this.height);
-		ctx.stroke();
 		ctx.restore();
 		this.pos = [x, y];
 		this.normal = normal;
@@ -363,7 +366,7 @@ function render() {
 					check(corners[1], corners[2]);
 					check(corners[2], corners[3]);
 					check(corners[3], corners[0]);
-					if (false) { //###
+					if (debugging) {
 						ctx.strokeStyle = hits.length? "red": "lime";
 						ctx.beginPath();
 						ctx.moveTo(corners[0][0], corners[0][1]);
