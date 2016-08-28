@@ -422,6 +422,8 @@ function start() {
 		window.localStorage.setItem("prev_plays", stats.prev_plays + 1);
 	} catch(e) { console.log("error accessing localStorage:", e); }
 	report("info", stats);
+	for (var bg=1; bg<backgrounds.length; bg++)
+		backgrounds[bg][0] += backgrounds[bg-1][0] + 400;
 }
 
 function game_over() {
@@ -484,9 +486,11 @@ function render() {
 		var bg_ofs = (-x_ofs * 100) % canvas.width;
 		background.render(ctx, bg_ofs, 0, canvas.width, canvas.height);
 		background.render(ctx, bg_ofs + canvas.width, 0, canvas.width, canvas.height);
+		var bg_wrap = (backgrounds[backgrounds.length-1][0] + 500);
 		for (var bg in backgrounds) {
 			bg = backgrounds[bg];
-			bg[2].render(ctx, bg[0] - x_ofs * 100, canvas.height / 5 * bg[1], 300, 200);
+			bg[2].render(ctx, (bg[0] - x_ofs * 100) % bg_wrap, canvas.height / 8 * bg[1], 300, 200);
+			bg[2].render(ctx, (bg[0] - x_ofs * 100) % bg_wrap + bg_wrap, canvas.height / 8 * bg[1], 300, 200);
 		}
 		for (var layer in layers) {
 			layers[layer].render(ctx, y_scaler, x_ofs);
