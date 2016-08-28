@@ -7,6 +7,7 @@ var hints = [
 	"the longer the shot, the higher the score!",
 	"hit a dead one to double the points!",
 	"hitting on alternate tracks doubles the points too!",
+	window.ontouchstart? "": "you should try this on a touch screen too ;)",
 ];
 var hint = 0;
 
@@ -50,7 +51,7 @@ function Layer(colour, x_scale, y_scale, y_ofs, y_func) {
 	this.y_scale = y_scale;
 	this.y_ofs = y_ofs;
 	this.y_func = y_func;
-	this._segment_cache = {}
+	this._segment_cache = {};
 }
 Layer.prototype = {
 	segment: function(x_start, x_step, x_stop) {
@@ -61,9 +62,10 @@ Layer.prototype = {
 		var y = y_func(x_start);
 		var seg = [];
 		var emit = function(x1, y1, x2, y2) {
-			var len = Math.sqrt((x1-x2)*(x1-x2) + (y1-y2)*(y1-y2));
-			var x = (x2 - x1) / len * Math.random() * 0.1;
-			var y = (y2 - y1) / len * Math.random() * 0.1;
+			var dx = x2 - x1, dy = y2 - y1;
+			var len = Math.sqrt(dx * dx + dy * dy);
+			var x = dx / len * Math.random() * 0.1;
+			var y = dy / len * Math.random() * 0.1;
 			seg.push(x1 - x, y1 - y, x2 + x, y2 + y);
 			return x2 + Math.random() * 0.01;
 		};
@@ -220,7 +222,8 @@ Thing.prototype = {
 		var angle = Math.atan2(this.normal[1], this.normal[0]) + Math.PI * 1.5;
 		var transform = new Transform2D();
 		transform.translate(this.pos[0], this.pos[1]);
-		transform.rotate(angle);
+		if (!this.died_time)
+			transform.rotate(angle);
 		ret.push(
 			transform.project(-this.width, -this.height),
 			transform.project(-this.width, 0),
@@ -349,6 +352,7 @@ function start() {
 
 function spawn() {
 	last_spawn_time = now();
+	if (things.length > 20) return;
 	var mins = new Array(layers.length);
 	// which layer has a thing furthest from the end?
 	for (var thing in things) {
@@ -477,12 +481,12 @@ function render() {
 						last_kill_time = now;
 						is_lethal = true;
 						if (thing.died_time) {
-							// if you hit a dead one, it douböes its score each time...
+							// if you hit a dead one, it doubles its score each time...
 							thing.score_multiplier *= 2;
 						} else {
 							thing.died_time = now;
 							thing.score_multiplier += Math.floor(((now - arrow.start_time) * arrow.power) / 30);
-							if (last_kill_layer !== thing.layer) {
+							if (last_kill_layer !== thing.layer) { // different track from last time?
 								thing.score_multipler *= 2;
 								last_kill_layer = thing.layer;
 							}
