@@ -132,6 +132,7 @@ function Thing(layer, speed, colour, width, height, sprite) {
 	this.sprite = sprite;
 	this.start_time = now();
 	this.step = 0;
+	this.dead = false;
 }
 Thing.prototype = {
 	render: function(ctx, now, y_scaler, x_ofs) {
@@ -149,7 +150,6 @@ Thing.prototype = {
 		var y = layer.y_func(x) * y_scale + y_ofs;
 		var normal = layer.normal(x);
 		normal[0] *= (layer.y_scale * y_scaler) / layer.x_scale;
-		var dx = normal[0], dy = normal[1];
 		x = (x - x_ofs) * layer.x_scale;
 		ctx.strokeStyle = this.colour;
 		ctx.beginPath();
@@ -158,7 +158,7 @@ Thing.prototype = {
 		ctx.stroke();
 		ctx.save();
 		ctx.translate(x, y);
-		ctx.rotate(Math.atan2(dy, dx) + Math.PI * 1.5);
+		ctx.rotate(Math.atan2(normal[1], normal[0]) + Math.PI * 1.5);
 		if (this.sprite && this.sprite.width) {
 			this.sprite.render(ctx, -this.width, -this.height, this.width, this.height, elapsed * 5);
 		}
@@ -168,6 +168,19 @@ Thing.prototype = {
 		this.pos = [x, y];
 		this.normal = normal;
 	},
+	corners: function() {
+		var ret = [];
+		var angle = Math.atan2(this.normal[1], this.normal[0]) + Math.PI * 1.5;
+		var transform = new Transform2D();
+		transform.translate(this.pos[0], this.pos[1]);
+		transform.rotate(angle);
+		ret.push(
+			transform.project(-this.width, -this.height),
+			transform.project(-this.width, 0),
+			transform.project(0, 0),
+			transform.project(0, -this.height));
+		return ret;
+	}
 };
 
 var player = new Thing(layers[1], 0, "blue", 40, 30);
@@ -181,7 +194,8 @@ function Arrow() {
 	this.hand = hand;
 	var dx = hand[0] - shoulder[0], dy = hand[1] - shoulder[1];
 	var normalize = 1 / Math.sqrt(dx * dx + dy * dy);
-	this.arm = [dx * normalize, dy * normalize];
+	this.pos = this.last_pos = null;
+	this.dir = [dx * normalize, dy * normalize];
 	this.start_time = now();
 	this.azimuth = bow_azimuth;
 	this.power = 1 - get_bow_draw_len(this.start_time);
@@ -190,6 +204,7 @@ function Arrow() {
 Arrow.prototype = {
 	colour: "black",
 	path_colour: "lightgray",
+	length: 16,
 	_cheveron: function(ctx, x, y, dx, dy, ofs, len) {
 		ctx.beginPath();
 		var x1 = x + dx * ofs, y1 = y + dy * ofs;
@@ -202,7 +217,7 @@ Arrow.prototype = {
 	render: function(ctx, now, x_ofs) {
 		var t = ((now - this.start_time) * this.power) / 3;
 		var hand_x = this.hand[0], hand_y = this.hand[1];
-		var dx = this.arm[0], dy = this.arm[1];
+		var dx = this.dir[0], dy = this.dir[1];
 		ctx.strokeStyle = this.path_colour;
 		ctx.save();
 		ctx.setLineDash([5]);
@@ -214,15 +229,17 @@ Arrow.prototype = {
 		ctx.strokeStyle = this.colour;
 		var x1 = hand_x + dx * t;
 		var y1 = hand_y + dy * t;
-		var x2 = x1 - dx * 15;
-		var y2 = y1 - dy * 15;
+		var x2 = x1 - dx * this.length;
+		var y2 = y1 - dy * this.length;
 		ctx.beginPath();
 		ctx.moveTo(x1, y1);
 		ctx.lineTo(x2, y2);
 		ctx.stroke();
-		this._cheveron(ctx, x2, y2, dx, dy, 14.5, 3);
+		this._cheveron(ctx, x2, y2, dx, dy, this.length, 3);
 		this._cheveron(ctx, x2, y2, dx, dy, 0, 3);
 		this._cheveron(ctx, x2, y2, dx, dy, 3, 3);
+		this.last_pos = this.pos;
+		this.pos = [x1, y1];
 		return t > this.lifetime;
 	},
 };
@@ -254,7 +271,7 @@ function start() {
 	canvas.ontouchend = canvas.ontouchcancel = canvas.onmouseup = function(evt) {
 		evt.preventDefault();
 		var pos = evt.touches? evt.touches[0]: evt;
-		if (pos) {
+		if (pos) { // touchend doens't have any more touch points, so use previous report
 			mouse_pos = [Math.max(canvas.width / 2, pos.clientX), pos.clientY];
 		}
 		if (bow_draw_start && shoulder)
@@ -282,7 +299,7 @@ function render() {
 		for (var idx in things) {
 			var thing = things[idx];
 			thing.render(ctx, now, y_scaler, x_ofs);
-			if (thing.pos[0] < -thing.width || thing.pos[0] > canvas.width + thing.width)
+			if (thing.pos[0] < -thing.width || thing.pos[0] > canvas.width + thing.width || thing.dead)
 				old.push(idx);
 		}
 		for (var idx = old.length; idx --> 0; ) {
@@ -293,7 +310,10 @@ function render() {
 		player.render(ctx, now, y_scaler, x_ofs);
 		if (mouse_pos) {
 			if (bow_draw_start) {
-				var bow_draw_len = get_bow_draw_len(now);
+				if (now - bow_draw_start > 2500)
+					bow_draw_start = null;
+				else
+					var bow_draw_len = get_bow_draw_len(now);
 			}
 			ctx.strokeStyle = player.colour;
 			ctx.beginPath();
@@ -323,7 +343,44 @@ function render() {
 		var old = [];
 		for (var idx in arrows) {
 			var arrow = arrows[idx];
-			if (arrow.render(ctx, now, x_ofs))
+			var is_old = arrow.render(ctx, now, x_ofs);
+			var is_lethal = false;
+			for (var thing_idx in things) {
+				var thing = things[thing_idx];
+				if (!thing.pos) continue;
+				var dx = arrow.pos[0] - thing.pos[0], dy = arrow.pos[1] - thing.pos[1];
+				if (dx * dx + dy * dy <= thing.width * thing.width + thing.height * thing.height && arrow.last_pos) {
+					var corners = thing.corners();
+					var hits = [];
+					var check = function(a, b) {
+						var hit = line_intersection(
+							arrow.pos[0], arrow.pos[1], arrow.last_pos[0], arrow.last_pos[0],
+							a[0], a[1], b[0], b[1]);
+						if (hit)
+							hits.push(hit);
+					};
+					check(corners[0], corners[1]);
+					check(corners[1], corners[2]);
+					check(corners[2], corners[3]);
+					check(corners[3], corners[0]);
+					if (false) { //###
+						ctx.strokeStyle = hits.length? "red": "lime";
+						ctx.beginPath();
+						ctx.moveTo(corners[0][0], corners[0][1]);
+						ctx.lineTo(corners[1][0], corners[1][1]);
+						ctx.lineTo(corners[2][0], corners[2][1]);
+						ctx.lineTo(corners[3][0], corners[3][1]);
+						ctx.lineTo(corners[0][0], corners[0][1]);
+						ctx.stroke();
+					}
+					if (hits.length) {
+						is_lethal = true;
+						thing.dead = true;
+						break;
+					}
+				}
+			}
+			if (is_old || is_lethal)
 				old.push(idx);
 		}
 		for (var idx = old.length; idx --> 0; ) {
