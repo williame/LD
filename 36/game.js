@@ -267,9 +267,8 @@ var things = [
 	new Thing(layers[0], 900, "red", 60, 40, sprites.boar, 1),
 	new Thing(layers[2], 1500, "red", 100, 80, sprites.buffalo, 1),
 	new Thing(layers[2], 1000, "red", 60, 40, sprites.boar, 1),
-	
 ];
-	
+
 function Arrow() {
 	console.assert(this instanceof Arrow);
 	this.hand = hand;
@@ -326,6 +325,52 @@ Arrow.prototype = {
 };
 var arrows = [];
 
+function Sound(filename) {
+	console.assert(this instanceof Sound);
+	var self = this;
+	var audioFactory = window.audioContext || window.AudioContext || window.webkitAudioContext || window.mozAudioContext;
+	if(audioFactory) {
+		this.audio = new audioFactory();
+		var doc = new XMLHttpRequest();
+		doc.open("GET", filename, true);
+		doc.responseType = "arraybuffer";
+		doc.overrideMimeType('text/plain; charset=x-user-defined');
+		doc.onerror = function(e) { console.log("cannot load", filename, e); };
+		doc.onreadystatechange = function() {
+			if (doc.readyState==4 && (!doc.status || doc.status==200))
+				self.audio.decodeAudioData(doc.response, function(clip) { self.clip = clip; });
+		};
+		doc.send();
+	} else {
+		console.log("no audioContext", filename);
+	}
+}
+Sound.prototype = {
+	play: function(volume) {
+		if (this.clip) try {
+			var source = this.audio.createBufferSource();
+			source.buffer = this.clip;
+			if(volume) {
+				var gainNode = audio.createGainNode();
+				source.connect(gainNode);
+				gainNode.connect(this.audio.destination);
+				gainNode.gain.value = volume;
+			} else
+				source.connect(this.audio.destination);
+			if (source) {
+				source.start? source.start(): source.noteOn(0);
+			}
+		} catch(error) {
+			// not fatal
+			console.log("ERROR playing sound: ", this.clip, error);
+		}
+	},
+};
+
+var sounds = {
+	bow_loose: new Sound("bow_loose.ogg"),
+};
+
 var start_time, last_spawn_time, last_boss_time, last_kill_time, last_kill_layer, mouse_pos;
 
 var bow_draw_start, shoulder, hand, bow_azimuth = 0;
@@ -359,6 +404,7 @@ function start() {
 		if (bow_draw_start && shoulder && get_bow_draw_len() < 0.90)
 			arrows.push(new Arrow());
 		bow_draw_start = null;
+		sounds.bow_loose.play();
 	};
 	canvas.setAttribute('tabindex','0');
 	canvas.focus();
