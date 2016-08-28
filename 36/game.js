@@ -2,6 +2,14 @@
 
 function now() { return (new Date()).getTime(); }
 
+var hints = [
+	"use your " + (window.ontouchstart? "fingers": "mouse") +" to shoot arrows!",
+	"the longer the shot, the higher the score!",
+	"hit a dead one to double the points!",
+	"hitting on alternate tracks doubles the points too!",
+];
+var hint = 0;
+
 function getParameterByName(name) {
 	name = name.replace(/[\[]/, "\\\[").replace(/[\]]/, "\\\]");
 	var	regexS = "[\\?&]" + name + "=([^&#]*)",
@@ -147,11 +155,12 @@ function Thing(layer, speed, colour, width, height, sprite, score) {
 	this.step = 0;
 	this.died_time = null;
 	this.score = score || 0;
+	this.score_multiplier = 1;
 }
 Thing.prototype = {
 	render: function(ctx, now, y_scaler, x_ofs) {
 		if (this.died_time) {
-			var elapsed = (now - this.died_time) / 50;
+			var elapsed = (now - this.died_time) / 2000;
 			var x = this.pos[0], y = this.pos[1];
 			if (this.sprite && this.sprite.width) {
 				ctx.save();
@@ -160,11 +169,11 @@ Thing.prototype = {
 				ctx.restore();
 			}
 			ctx.save();
+			ctx.textBaseline = "top";
+			ctx.textAlign = "right";
 			ctx.font = "24px fantasy, 'Comic Sans', Serif";
 			ctx.fillStyle = this.colour;
-			ctx.fillText(this.score, x, y);
-			ctx.font = "12px fantasy, 'Comic Sans', Serif";
-			ctx.fillText("(hit me again for double pts!)", x, y + 20);
+			ctx.fillText(Math.floor(this.score * this.score_multiplier), x, y);
 			ctx.restore();
 			y -= elapsed;
 			this.pos[1] = y;
@@ -228,8 +237,8 @@ var player = new Thing(layers[1], 0, "blue", 40, 30, null);
 player.kills = 0;
 
 var things = [
-	new Thing(layers[0], 1000, "green", 50, 40, sprites.buffalo, 1000),
-	new Thing(layers[2], 2000, "maroon", 50, 40, sprites.buffalo, 1000)];
+	new Thing(layers[0], 1000, "red", 50, 40, sprites.buffalo, 1),
+	new Thing(layers[2], 2000, "red", 50, 40, sprites.buffalo, 1)];
 	
 function Arrow() {
 	console.assert(this instanceof Arrow);
@@ -287,7 +296,7 @@ Arrow.prototype = {
 };
 var arrows = [];
 
-var start_time, mouse_pos;
+var start_time, last_spawn_time, last_kill_time, last_kill_layer, mouse_pos;
 
 var bow_draw_start, shoulder, hand, bow_azimuth = 0;
 
@@ -304,6 +313,7 @@ function start() {
 		var pos = evt.touches? evt.touches[0]: evt;
 		mouse_pos = [Math.max(canvas.width / 2, pos.clientX), pos.clientY];
 		bow_draw_start = now();
+		if (!hint) hint++;
 	};
 	canvas.ontouchmove = canvas.onmousemove = function(evt) {
 		evt.preventDefault();
@@ -322,25 +332,45 @@ function start() {
 	};
 	canvas.setAttribute('tabindex','0');
 	canvas.focus();
-	start_time = now();
+	start_time = last_spawn_time = now();
+	player.uid = null;
 	var stats = {
 		game: "LD36",
+		uid: player.uid,
 	};
-	player.uid = Math.floor(Math.random() * 100000000);
 	if (storageAvailable("localStorage")) try {
-		stats.uid = player.uid = window.localStorage.getItem("uid") || player.uid;
+		stats.uid = player.uid = window.localStorage.getItem("uid") || Math.floor(Math.random() * 1000000000);
 		window.localStorage.setItem("uid", stats.uid);
-		stats.prev_plays = window.localStorage.getItem("prev_plays") || 0;
+		stats.prev_plays = parseInt(window.localStorage.getItem("prev_plays") || 0);
 		window.localStorage.setItem("prev_plays", stats.prev_plays + 1);
-	} catch(e) { console.log("error getting prev:", e); }
+	} catch(e) { console.log("error accessing localStorage:", e); }
 	report("info", stats);
 }
+
+function spawn() {
+	last_spawn_time = now();
+	var mins = new Array(layers.length);
+	// which layer has a thing furthest from the end?
+	for (var thing in things) {
+		thing = things[thing];
+		var layer = layers.indexOf(thing.layer);
+		if (thing.pos && (!mins[layer] || thing.pos[0] < mins[layer][0])) {
+			mins[layer] = [thing.pos[0], thing, layer];
+		}
+	}
+	mins.sort(function (a, b) { return !a? -1: !b? 1: b[0] - a[0]; });
+	if (mins[0])
+		things.push(mins[0][1].clone());
+}			
 
 function render() {
 	window.requestAnimationFrame(render);
 	try {
 		var now = window.now();
 		var elapsed = now - start_time;
+		if (now - last_spawn_time > 10000) {
+			spawn();
+		}
 		var x_ofs = elapsed / 1000;
 		var y_scaler = canvas.height / 1000;
 		var ctx = canvas.getContext("2d");
@@ -357,7 +387,7 @@ function render() {
 		for (var idx = old.length; idx --> 0; ) {
 			var thing = things[old[idx]];
 			if (thing.died_time) {
-				player.score += thing.score;
+				player.score += Math.floor(thing.score * thing.score_multiplier);
 				player.kills++;
 				var stats = {
 					game: "LD36",
@@ -366,6 +396,7 @@ function render() {
 					award: thing.score,
 					score: player.score,
 					play_time: elapsed / 1000,
+					things: things.length,
 				};
 				report("info", stats);
 			}
@@ -441,13 +472,20 @@ function render() {
 						ctx.stroke();
 					}
 					if (hits.length) {
+						if (hint == 1 || (now - last_kill_time > 10000))
+							hint++;
+						last_kill_time = now;
 						is_lethal = true;
 						if (thing.died_time) {
-							// if you hit a dead one, it doubles its score...
-							// and will be cloned with a double-scorer too!
-							thing.score *= 2;
+							// if you hit a dead one, it douböes its score each time...
+							thing.score_multiplier *= 2;
 						} else {
 							thing.died_time = now;
+							thing.score_multiplier += Math.floor(((now - arrow.start_time) * arrow.power) / 30);
+							if (last_kill_layer !== thing.layer) {
+								thing.score_multipler *= 2;
+								last_kill_layer = thing.layer;
+							}
 						}
 						break;
 					}
@@ -461,10 +499,14 @@ function render() {
 		}
 		ctx.save();
 		ctx.textBaseline = "top";
-		ctx.textAlign = "right";
 		ctx.font = "32px fantasy, 'Comic Sans', Serif";
 		ctx.fillStyle = "red";
+		ctx.textAlign = "right";
 		ctx.fillText(player.score + " pts", canvas.width - 10, 10);
+		if (hint < hints.length) {
+			ctx.textAlign = "left";
+			ctx.fillText(hints[hint], 10, 10);
+		}
 		ctx.restore();
 	} catch(e) {
 		window.onerror(e.message, e.filename, e.lineno, e.colno, e.error);
