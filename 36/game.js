@@ -136,7 +136,7 @@ function Sprite(filename, cols, rows, frames, options) {
 }
 Sprite.prototype = {
 	render: function(ctx, x, y, width, height, idx) {
-		var frame = Math.floor(idx) % this.frames;
+		var frame = Math.floor(idx || 0) % this.frames;
 		var sy = Math.floor(frame / this.cols) * this.height;
 		var sx = (frame % this.cols) * this.width;
 		ctx.drawImage(this.img,
@@ -147,9 +147,17 @@ Sprite.prototype = {
 var sprites = {
 	buffalo: new Sprite("buffalo.png", 4, 4, 16, {left: 0, top: 60}),
 	mastodon: new Sprite("mastodon.png", 4, 4, 12, {left: 60, top: 40, right: 660, scale: 1.5, y: -20}),
+	mammoth: new Sprite("mammoth.png", 4, 4, 4, {left: 100, right: 1300, scale: 1.5, y: -25}),
 	boar: new Sprite("boar.png", 4, 2, 8, {top: 160, bottom: 375}),
 	smilodon: new Sprite("smilodon.png", 8, 4, 24, {left: 32, top: 110, right: 1042, bottom: 475, scale: 1.5, y: -10}),
 };
+
+var backgrounds = [
+	[Math.random() * 1000, Math.random() * 5, new Sprite("CavePainting_deer.png", 1, 1)],
+	[Math.random() * 1000, Math.random() * 5, new Sprite("CavePainting_dino.png", 1, 1)], 
+	[Math.random() * 1000, Math.random() * 5, new Sprite("CavePainting_happyhunter.png", 1, 1)],
+	[Math.random() * 1000, Math.random() * 5, new Sprite("CavePainting_hunter.png", 1, 1)],
+];
 
 function Thing(layer, speed, colour, width, height, sprite, score) {
 	console.assert(this instanceof Thing);
@@ -200,7 +208,7 @@ Thing.prototype = {
 				var x = x_ofs + elapsed;
 			}
 		} else {
-			elapsed /= 300;
+			elapsed /= 500;
 			var x = x_ofs + 1;
 		}
 		var y_scale = layer.y_scale * y_scaler;
@@ -249,7 +257,7 @@ Thing.prototype = {
 	}
 };
 
-var player = new Thing(layers[1], 0, "blue", 50, 50, sprites.mastodon);
+var player = new Thing(layers[1], 0, "blue", 50, 50, sprites.mammoth);
 player.kills = 0;
 var boss;
 
@@ -426,6 +434,10 @@ function render() {
 		var y_scaler = canvas.height / 1000;
 		var ctx = canvas.getContext("2d");
 		ctx.clearRect(0, 0, canvas.width, canvas.height);
+		for (var bg in backgrounds) {
+			var background = backgrounds[bg];
+			background[2].render(ctx, background[0] - x_ofs * 100, canvas.height / 5 * background[1], 300, 200);
+		}
 		for (var layer in layers) {
 			layers[layer].render(ctx, y_scaler, x_ofs);
 		}
