@@ -246,7 +246,7 @@ function start() {
 		var pos = evt.touches? evt.touches[0]: evt;
 		mouse_pos = [Math.max(canvas.width / 2, pos.clientX), pos.clientY];
 	};
-	canvas.ontouchstop = canvas.ontouchcancel = canvas.onmouseup = function(evt) {
+	canvas.ontouchend = canvas.ontouchcancel = canvas.onmouseup = function(evt) {
 		evt.preventDefault();
 		var pos = evt.touches? evt.touches[0]: evt;
 		mouse_pos = [Math.max(canvas.width / 2, pos.clientX), pos.clientY];
