@@ -326,8 +326,9 @@ function start() {
 	var stats = {
 		game: "LD36",
 	};
+	player.uid = Math.floor(Math.random() * 100000000);
 	if (storageAvailable("localStorage")) try {
-		stats.uid =  window.localStorage.getItem("uid") || Math.floor(Math.random() * 100000000);
+		stats.uid = player.uid = window.localStorage.getItem("uid") || player.uid;
 		window.localStorage.setItem("uid", stats.uid);
 		stats.prev_plays = window.localStorage.getItem("prev_plays") || 0;
 		window.localStorage.setItem("prev_plays", stats.prev_plays + 1);
@@ -360,6 +361,7 @@ function render() {
 				player.kills++;
 				var stats = {
 					game: "LD36",
+					uid: player.uid,
 					kills: player.kills,
 					award: thing.score,
 					score: player.score,
