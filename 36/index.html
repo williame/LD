@@ -82,6 +82,14 @@ body {
 
 var debugging, server, canvas;
 
+function report(type, message) {
+	var doc = new XMLHttpRequest();
+	doc.open("POST", "http://" + server + "/api/report_" + type, true);
+	doc.overrideMimeType("text/plain");
+	doc.onerror = function(error) { console.log("could not report " + type +":", server, error, message); };
+	doc.send(JSON.stringify(message));
+}
+
 function init() {
 	console.log("init...");
 	debugging = "file:" === window.location.protocol || window.location.hostname == "localhost";
@@ -92,11 +100,7 @@ function init() {
 				throw new Error(JSON.stringify(arguments || []));
 			} catch(e) { error = e;}
 			console.log("error", error, "at", error.stack? error.stack: "?");
-			var doc = new XMLHttpRequest();
-			doc.open("POST", "http://" + server + "/api/report_error", true);
-			doc.overrideMimeType("text/plain");
-			doc.onerror = function(error) { console.log("could not report error:", error); };
-			doc.send(JSON.stringify({ error: error, stack: error.stack}));
+			report("error", { game: "LD36", error: error, stack: error.stack});
 			if (!debugging && !getParameterByName("debugging")) {
 				window.setTimeout(function() { window.location.reload(false); }, 2500);
 			}

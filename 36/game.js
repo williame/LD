@@ -11,6 +11,19 @@ function getParameterByName(name) {
 	return decodeURIComponent(results[1].replace(/\+/g, " "));
 }
 
+function storageAvailable(type) {
+	try {
+		var storage = window[type],
+			x = '__storage_test__';
+		storage.setItem(x, x);
+		storage.removeItem(x);
+		return true;
+	}
+	catch(e) {
+		return false;
+	}
+}
+
 function modal(html) {
 	var modal = document.getElementById("modal");
 	var dialog = document.getElementById("modal_dialog");
@@ -120,7 +133,7 @@ var sprites = {
 	buffalo: new Sprite("buffalo.png", 4, 4, 16, 0, 60),
 };
 
-function Thing(layer, speed, colour, width, height, sprite) {
+function Thing(layer, speed, colour, width, height, sprite, score) {
 	console.assert(this instanceof Thing);
 	this.layer = layer;
 	this.speed = speed;
@@ -132,10 +145,31 @@ function Thing(layer, speed, colour, width, height, sprite) {
 	this.sprite = sprite;
 	this.start_time = now();
 	this.step = 0;
-	this.dead = false;
+	this.died_time = null;
+	this.score = score || 0;
 }
 Thing.prototype = {
 	render: function(ctx, now, y_scaler, x_ofs) {
+		if (this.died_time) {
+			var elapsed = (now - this.died_time) / 50;
+			var x = this.pos[0], y = this.pos[1];
+			if (this.sprite && this.sprite.width) {
+				ctx.save();
+				ctx.scale(1, -1);
+				this.sprite.render(ctx, x-this.width, -y, this.width, this.height, 0);
+				ctx.restore();
+			}
+			ctx.save();
+			ctx.font = "24px fantasy, 'Comic Sans', Serif";
+			ctx.fillStyle = this.colour;
+			ctx.fillText(this.score, x, y);
+			ctx.font = "12px fantasy, 'Comic Sans', Serif";
+			ctx.fillText("(hit me again for double pts!)", x, y + 20);
+			ctx.restore();
+			y -= elapsed;
+			this.pos[1] = y;
+			return y < 0;
+		}
 		var layer = this.layer;
 		var elapsed = (now - this.start_time);
 		if (this.speed) {
@@ -170,6 +204,7 @@ Thing.prototype = {
 		ctx.restore();
 		this.pos = [x, y];
 		this.normal = normal;
+		return x < -this.width || x > canvas.width + this.width;
 	},
 	corners: function() {
 		var ret = [];
@@ -183,14 +218,18 @@ Thing.prototype = {
 			transform.project(0, 0),
 			transform.project(0, -this.height));
 		return ret;
+	},
+	clone: function() {
+		return new Thing(this.layer, this.speed, this.colour, this.width, this.height, this.sprite, this.score);
 	}
 };
 
-var player = new Thing(layers[1], 0, "blue", 40, 30);
+var player = new Thing(layers[1], 0, "blue", 40, 30, null);
+player.kills = 0;
 
 var things = [
-	new Thing(layers[0], 1000, "green", 50, 40, sprites.buffalo),
-	new Thing(layers[2], 2000, "maroon", 50, 40, sprites.buffalo)];
+	new Thing(layers[0], 1000, "green", 50, 40, sprites.buffalo, 1000),
+	new Thing(layers[2], 2000, "maroon", 50, 40, sprites.buffalo, 1000)];
 	
 function Arrow() {
 	console.assert(this instanceof Arrow);
@@ -284,6 +323,16 @@ function start() {
 	canvas.setAttribute('tabindex','0');
 	canvas.focus();
 	start_time = now();
+	var stats = {
+		game: "LD36",
+	};
+	if (storageAvailable("localStorage")) try {
+		stats.uid =  window.localStorage.getItem("uid") || Math.floor(Math.random() * 100000000);
+		window.localStorage.setItem("uid", stats.uid);
+		stats.prev_plays = window.localStorage.getItem("prev_plays") || 0;
+		window.localStorage.setItem("prev_plays", stats.prev_plays + 1);
+	} catch(e) { console.log("error getting prev:", e); }
+	report("info", stats);
 }
 
 function render() {
@@ -301,14 +350,27 @@ function render() {
 		var old = [];
 		for (var idx in things) {
 			var thing = things[idx];
-			thing.render(ctx, now, y_scaler, x_ofs);
-			if (thing.pos[0] < -thing.width || thing.pos[0] > canvas.width + thing.width || thing.dead)
+			if (thing.render(ctx, now, y_scaler, x_ofs))
 				old.push(idx);
 		}
 		for (var idx = old.length; idx --> 0; ) {
 			var thing = things[old[idx]];
+			if (thing.died_time) {
+				player.score += thing.score;
+				player.kills++;
+				var stats = {
+					game: "LD36",
+					kills: player.kills,
+					award: thing.score,
+					score: player.score,
+					play_time: elapsed / 1000,
+				};
+				report("info", stats);
+			}
 			things.splice(old[idx], 1);
-			things.push(new Thing(thing.layer, thing.speed, thing.colour, thing.width, thing.height, thing.sprite));
+			thing = thing.clone();
+			thing.speed * 1.1;
+			things.push(thing);
 		}
 		player.render(ctx, now, y_scaler, x_ofs);
 		if (mouse_pos) {
@@ -378,7 +440,13 @@ function render() {
 					}
 					if (hits.length) {
 						is_lethal = true;
-						thing.dead = true;
+						if (thing.died_time) {
+							// if you hit a dead one, it doubles its score...
+							// and will be cloned with a double-scorer too!
+							thing.score *= 2;
+						} else {
+							thing.died_time = now;
+						}
 						break;
 					}
 				}
@@ -389,6 +457,13 @@ function render() {
 		for (var idx = old.length; idx --> 0; ) {
 			arrows.splice(old[idx], 1);
 		}
+		ctx.save();
+		ctx.textBaseline = "top";
+		ctx.textAlign = "right";
+		ctx.font = "32px fantasy, 'Comic Sans', Serif";
+		ctx.fillStyle = "red";
+		ctx.fillText(player.score + " pts", canvas.width - 10, 10);
+		ctx.restore();
 	} catch(e) {
 		window.onerror(e.message, e.filename, e.lineno, e.colno, e.error);
 	}
