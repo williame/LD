@@ -108,9 +108,9 @@ Layer.prototype = {
 };
 
 var layers = [
-	new Layer("tan", 50, 300, -100, function(x) { return Math.sin(x) * 0.1 + Math.sin(x * 0.3) * 0.2; }),
+	new Layer("black", 50, 300, -100, function(x) { return Math.sin(x) * 0.1 + Math.sin(x * 0.3) * 0.2; }),
 	new Layer("black", 100, 500, 100, function(x) { return Math.sin(x) * 0.1 + Math.sin(x * 0.3) * 0.2; }),
-	new Layer("darkgray", 200, 300, 400, function(x) { return Math.sin(x) * 0.1 + Math.sin(x * 0.3) * 0.2; })];
+	new Layer("black", 200, 300, 400, function(x) { return Math.sin(x) * 0.1 + Math.sin(x * 0.3) * 0.2; })];
 
 function Sprite(filename, cols, rows, frames, options) {
 	console.assert(this instanceof Sprite);
@@ -158,6 +158,7 @@ var backgrounds = [
 	[Math.random() * 1000, Math.random() * 5, new Sprite("CavePainting_happyhunter.png", 1, 1)],
 	[Math.random() * 1000, Math.random() * 5, new Sprite("CavePainting_hunter.png", 1, 1)],
 ];
+var background = new Sprite("background2.jpg", 1, 1);
 
 function Thing(layer, speed, colour, width, height, sprite, score) {
 	console.assert(this instanceof Thing);
@@ -434,9 +435,12 @@ function render() {
 		var y_scaler = canvas.height / 1000;
 		var ctx = canvas.getContext("2d");
 		ctx.clearRect(0, 0, canvas.width, canvas.height);
+		var bg_ofs = (-x_ofs * 100) % canvas.width;
+		background.render(ctx, bg_ofs, 0, canvas.width, canvas.height);
+		background.render(ctx, bg_ofs + canvas.width, 0, canvas.width, canvas.height);
 		for (var bg in backgrounds) {
-			var background = backgrounds[bg];
-			background[2].render(ctx, background[0] - x_ofs * 100, canvas.height / 5 * background[1], 300, 200);
+			bg = backgrounds[bg];
+			bg[2].render(ctx, bg[0] - x_ofs * 100, canvas.height / 5 * bg[1], 300, 200);
 		}
 		for (var layer in layers) {
 			layers[layer].render(ctx, y_scaler, x_ofs);
