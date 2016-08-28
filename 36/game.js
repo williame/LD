@@ -86,7 +86,7 @@ var layers = [
 	new Layer("red", 100, 500, 100, function(x) { return Math.sin(x) * 0.1 + Math.sin(x * 0.3) * 0.2; }),
 	new Layer("green", 200, 300, 400, function(x) { return Math.sin(x) * 0.1 + Math.sin(x * 0.3) * 0.2; })];
 
-function Sprite(filename, cols, rows, frames) {
+function Sprite(filename, cols, rows, frames, left, top, right, bottom) {
 	console.assert(this instanceof Sprite);
 	var self = this;
 	this.cols = cols;
@@ -97,23 +97,27 @@ function Sprite(filename, cols, rows, frames) {
 	this.img = new Image();
 	this.img.onerror = function(e) { console.log("cannot load", filename, e); };
 	this.img.onload = function() {
-		self.width = self.img.width / self.cols;
-		self.height = self.img.height / self.rows;
+		self.left = left || 0;
+		self.right = right || self.img.width;
+		self.top = top || 0;
+		self.bottom = bottom || self.img.height;
+		self.width = (self.right - self.left) / self.cols;
+		self.height = (self.bottom - self.top) / self.rows;
 	};
 	this.img.src = filename;
 }
 Sprite.prototype = {
 	render: function(ctx, x, y, width, height, idx) {
 		var frame = Math.floor(idx) % this.frames;
-		var sy = 3 * this.height; //Math.floor(frame / this.cols) * this.height;
-		var sx = 2 * this.height; //(frame % this.cols) * this.width;
+		var sy = Math.floor(frame / this.cols) * this.height;
+		var sx = (frame % this.cols) * this.width;
 		ctx.drawImage(this.img,
-			sx, sy, this.width, this.height,
+			sx + this.left, sy + this.top, this.width, this.height,
 			x, y, width, height);
 	},
 };
 var sprites = {
-	buffalo: new Sprite("buffalo.png", 4, 4),
+	buffalo: new Sprite("buffalo.png", 4, 4, 16, 0, 60),
 };
 
 function Thing(layer, speed, colour, width, height, sprite) {
@@ -127,6 +131,7 @@ function Thing(layer, speed, colour, width, height, sprite) {
 	this.height = height;
 	this.sprite = sprite;
 	this.start_time = now();
+	this.step = 0;
 }
 Thing.prototype = {
 	render: function(ctx, now, y_scaler, x_ofs) {
@@ -152,12 +157,12 @@ Thing.prototype = {
 		ctx.arc(x, y, 5, 0, Math.PI*2);
 		ctx.stroke();
 		ctx.save();
-		ctx.translate(x, y - this.height / 2);
-		ctx.rotate(Math.atan2(dy, dx));
+		ctx.translate(x, y);
+		ctx.rotate(Math.atan2(dy, dx) + Math.PI * 1.5);
 		if (this.sprite && this.sprite.width) {
-			this.sprite.render(ctx, -this.width/2, 0, this.width, this.height, elapsed / 10);
+			this.sprite.render(ctx, -this.width, -this.height, this.width, this.height, elapsed * 5);
 		}
-		ctx.rect(-this.width/2, 0, this.width, this.height);
+		ctx.rect(-this.width, -this.height, this.width, this.height);
 		ctx.stroke();
 		ctx.restore();
 		this.pos = [x, y];
@@ -165,11 +170,11 @@ Thing.prototype = {
 	},
 };
 
-var player = new Thing(layers[1], 0, "blue", 20, 30);
+var player = new Thing(layers[1], 0, "blue", 40, 30);
 
 var things = [
-	new Thing(layers[0], 1000, "green", 25, 40, sprites.buffalo),
-	new Thing(layers[2], 2000, "maroon", 20, 50, sprites.buffalo)];
+	new Thing(layers[0], 1000, "green", 50, 40, sprites.buffalo),
+	new Thing(layers[2], 2000, "maroon", 50, 40, sprites.buffalo)];
 	
 function Arrow() {
 	console.assert(this instanceof Arrow);
