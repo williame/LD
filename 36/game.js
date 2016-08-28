@@ -258,7 +258,7 @@ Thing.prototype = {
 	}
 };
 
-var player = new Thing(layers[1], 0, "blue", 80, 100, sprites.mammoth);
+var player = new Thing(layers[1], 0, "black", 80, 100, sprites.mammoth);
 player.kills = 0;
 var boss;
 
@@ -388,7 +388,7 @@ function game_over() {
 		play_time: (now() - start_time) / 1000,
 		things: things.length,
 	});
-	modal("<big>GAME OVER!</big><hr/><centre>You scored " + player.score + "!<br>" +
+	modal("<big>GAME OVER!</big><hr/><centre>You have to shoot the sabre toothed tigers too!<br/>You scored " + player.score + "!<br>" +
 		'<small><u><a onclick="window.location.reload()" style="cursor:pointer">play again?</a></u></small></centre>');
 	setTimeout(function() { window.location.reload(); }, 3000);
 }
@@ -403,7 +403,7 @@ function spawn_boss() {
 
 function spawn() {
 	last_spawn_time = now();
-	if (things.length > 20) {
+	if (things.length > 10) {
 		if (!last_boss_time || last_spawn_time - last_boss_time > 20000) {
 			spawn_boss();
 		}
@@ -489,11 +489,12 @@ function render() {
 			}
 			ctx.strokeStyle = player.colour;
 			ctx.beginPath();
-			shoulder = [player.pos[0] - player.normal[0] * player.height * 1.1,
-				player.pos[1] - player.normal[1] * player.height * 1.1];
+			var scale = 40;
+			shoulder = [player.pos[0] - player.normal[0] * player.height * 0.8,
+				player.pos[1] - player.normal[1] * player.height * 0.8];
 			var x1 = shoulder[0], y1 = shoulder[1], x2 = mouse_pos[0], y2 = mouse_pos[1];
 			var dx = x2 - x1, dy = y2 - y1;
-			var normalize = (1 / Math.sqrt(dx * dx + dy * dy)) * player.height;
+			var normalize = (1 / Math.sqrt(dx * dx + dy * dy)) * scale;
 			hand = [x1 + dx * normalize, y1 + dy * normalize];
 			bow_azimuth = Math.atan2(dy, dx);
 			ctx.moveTo(x1, y1);
@@ -505,7 +506,7 @@ function render() {
 				ctx.beginPath();
 			}
 			ctx.arc(x1 + dx * normalize * 0.5, y1 + dy * normalize * 0.5,
-				player.height * 0.5,
+				scale * 0.5,
 				bow_azimuth - 1, bow_azimuth + 1);
 			if (bow_draw_start) {
 				ctx.lineTo(x1 + dx * bow_draw_len * normalize, y1 + dy * bow_draw_len * normalize);
