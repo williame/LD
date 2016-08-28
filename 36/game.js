@@ -145,11 +145,11 @@ Sprite.prototype = {
 	},
 };
 var sprites = {
-	buffalo: new Sprite("buffalo.png", 4, 4, 16, {left: 0, top: 60}),
+	buffalo: new Sprite("buffalo.png", 4, 3, 4, {top: 320}),
 	mastodon: new Sprite("mastodon.png", 4, 4, 12, {left: 60, top: 40, right: 660, scale: 1.5, y: -20}),
-	mammoth: new Sprite("mammoth.png", 4, 4, 4, {left: 100, right: 1300, scale: 1.5, y: -25}),
-	boar: new Sprite("boar.png", 4, 2, 8, {top: 160, bottom: 375}),
-	smilodon: new Sprite("smilodon.png", 8, 4, 24, {left: 32, top: 110, right: 1042, bottom: 475, scale: 1.5, y: -10}),
+	mammoth: new Sprite("mammoth.png", 4, 4, 4, {left: 100, right: 1300, scale: 1.5, y: -50}),
+	boar: new Sprite("boar.png", 4, 2, 4, {top: 300, bottom: 720}),
+	smilodon: new Sprite("smilodon.png", 8, 4, 24, {left: 32, top: 270, right: 2090, bottom: 900, scale: 1.5, y: -3}),
 };
 
 var backgrounds = [
@@ -258,15 +258,15 @@ Thing.prototype = {
 	}
 };
 
-var player = new Thing(layers[1], 0, "blue", 50, 50, sprites.mammoth);
+var player = new Thing(layers[1], 0, "blue", 80, 100, sprites.mammoth);
 player.kills = 0;
 var boss;
 
 var things = [
-	new Thing(layers[0], 1000, "red", 50, 40, sprites.buffalo, 1),
-	new Thing(layers[0], 900, "red", 30, 20, sprites.boar, 1),
-	new Thing(layers[2], 1500, "red", 50, 40, sprites.buffalo, 1),
-	new Thing(layers[2], 1000, "red", 30, 20, sprites.boar, 1),
+	new Thing(layers[0], 1000, "red", 100, 80, sprites.buffalo, 1),
+	new Thing(layers[0], 900, "red", 60, 40, sprites.boar, 1),
+	new Thing(layers[2], 1500, "red", 100, 80, sprites.buffalo, 1),
+	new Thing(layers[2], 1000, "red", 60, 40, sprites.boar, 1),
 	
 ];
 	
