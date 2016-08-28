@@ -2,12 +2,14 @@
 
 function now() { return (new Date()).getTime(); }
 
+function isTouchDevice() { return "ontouchstart" in window; }
+
 var hints = [
-	"use your " + (window.ontouchstart? "fingers": "mouse") +" to shoot arrows!",
+	"use your " + (isTouchDevice()? "fingers": "mouse") +" to shoot arrows!",
 	"the longer the shot, the higher the score!",
 	"hit a dead one to double the points!",
 	"hitting on alternate tracks doubles the points too!",
-	window.ontouchstart? "": "you should try this on a touch screen too ;)",
+	isTouchDevice()? "": "you should try this on a touch screen too ;)",
 ];
 var hint = 0;
 
@@ -109,7 +111,7 @@ var layers = [
 	new Layer("red", 100, 500, 100, function(x) { return Math.sin(x) * 0.1 + Math.sin(x * 0.3) * 0.2; }),
 	new Layer("green", 200, 300, 400, function(x) { return Math.sin(x) * 0.1 + Math.sin(x * 0.3) * 0.2; })];
 
-function Sprite(filename, cols, rows, frames, left, top, right, bottom) {
+function Sprite(filename, cols, rows, frames, options) {
 	console.assert(this instanceof Sprite);
 	var self = this;
 	this.cols = cols;
@@ -117,13 +119,14 @@ function Sprite(filename, cols, rows, frames, left, top, right, bottom) {
 	this.frames = frames || (cols * rows);
 	this.width = 0;
 	this.height = 0;
+	this.options = options || {};
 	this.img = new Image();
 	this.img.onerror = function(e) { console.log("cannot load", filename, e); };
 	this.img.onload = function() {
-		self.left = left || 0;
-		self.right = right || self.img.width;
-		self.top = top || 0;
-		self.bottom = bottom || self.img.height;
+		self.left = self.options.left || 0;
+		self.right = self.options.right || self.img.width;
+		self.top = self.options.top || 0;
+		self.bottom = self.options.bottom || self.img.height;
 		self.width = (self.right - self.left) / self.cols;
 		self.height = (self.bottom - self.top) / self.rows;
 	};
@@ -136,11 +139,12 @@ Sprite.prototype = {
 		var sx = (frame % this.cols) * this.width;
 		ctx.drawImage(this.img,
 			sx + this.left, sy + this.top, this.width, this.height,
-			x, y, width, height);
+			x + (this.options.x || 0), y + (this.options.y || 0), width * (this.options.scale || 1), height * (this.options.scale || 1));
 	},
 };
 var sprites = {
-	buffalo: new Sprite("buffalo.png", 4, 4, 16, 0, 60),
+	buffalo: new Sprite("buffalo.png", 4, 4, 16, {left: 0, top: 60}),
+	mastodon: new Sprite("mastodon.png", 4, 4, 12, {left: 60, top: 40, right: 660, scale: 1.5, y: -20}),
 };
 
 function Thing(layer, speed, colour, width, height, sprite, score) {
@@ -187,7 +191,7 @@ Thing.prototype = {
 			elapsed /= this.speed;
 			var x = x_ofs + elapsed;
 		} else {
-			elapsed /= 100;
+			elapsed /= 300;
 			var x = x_ofs + 1;
 		}
 		var y_scale = layer.y_scale * y_scaler;
@@ -236,7 +240,7 @@ Thing.prototype = {
 	}
 };
 
-var player = new Thing(layers[1], 0, "blue", 40, 30, null);
+var player = new Thing(layers[1], 0, "blue", 50, 50, sprites.mastodon);
 player.kills = 0;
 
 var things = [
@@ -476,7 +480,7 @@ function render() {
 						ctx.stroke();
 					}
 					if (hits.length) {
-						if (hint == 1 || (now - last_kill_time > 10000))
+						if (hint == 1 || (now - last_kill_time > 1000))
 							hint++;
 						last_kill_time = now;
 						is_lethal = true;
@@ -508,6 +512,7 @@ function render() {
 		ctx.textAlign = "right";
 		ctx.fillText(player.score + " pts", canvas.width - 10, 10);
 		if (hint < hints.length) {
+			ctx.font = "24px fantasy, 'Comic Sans', Serif";
 			ctx.textAlign = "left";
 			ctx.fillText(hints[hint], 10, 10);
 		}
