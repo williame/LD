@@ -10,6 +10,7 @@ var hints = [
 	"hit a dead one to double the points!",
 	"hitting on alternate tracks doubles the points too!",
 	isTouchDevice()? "": "you should try this on a touch screen too ;)",
+	"keep your eye peeled for the sabre toothed tiger!",
 ];
 var hint = 0;
 
@@ -107,13 +108,14 @@ Layer.prototype = {
 };
 
 var layers = [
-	new Layer("blue", 50, 300, -100, function(x) { return Math.sin(x) * 0.1 + Math.sin(x * 0.3) * 0.2; }),
-	new Layer("red", 100, 500, 100, function(x) { return Math.sin(x) * 0.1 + Math.sin(x * 0.3) * 0.2; }),
-	new Layer("green", 200, 300, 400, function(x) { return Math.sin(x) * 0.1 + Math.sin(x * 0.3) * 0.2; })];
+	new Layer("tan", 50, 300, -100, function(x) { return Math.sin(x) * 0.1 + Math.sin(x * 0.3) * 0.2; }),
+	new Layer("black", 100, 500, 100, function(x) { return Math.sin(x) * 0.1 + Math.sin(x * 0.3) * 0.2; }),
+	new Layer("darkgray", 200, 300, 400, function(x) { return Math.sin(x) * 0.1 + Math.sin(x * 0.3) * 0.2; })];
 
 function Sprite(filename, cols, rows, frames, options) {
 	console.assert(this instanceof Sprite);
 	var self = this;
+	this.name = filename;
 	this.cols = cols;
 	this.rows = rows;
 	this.frames = frames || (cols * rows);
@@ -145,6 +147,8 @@ Sprite.prototype = {
 var sprites = {
 	buffalo: new Sprite("buffalo.png", 4, 4, 16, {left: 0, top: 60}),
 	mastodon: new Sprite("mastodon.png", 4, 4, 12, {left: 60, top: 40, right: 660, scale: 1.5, y: -20}),
+	boar: new Sprite("boar.png", 4, 2, 8, {top: 160, bottom: 375}),
+	smilodon: new Sprite("smilodon.png", 8, 4, 24, {left: 32, top: 110, right: 1042, bottom: 475, scale: 1.5, y: -10}),
 };
 
 function Thing(layer, speed, colour, width, height, sprite, score) {
@@ -162,6 +166,7 @@ function Thing(layer, speed, colour, width, height, sprite, score) {
 	this.died_time = null;
 	this.score = score || 0;
 	this.score_multiplier = 1;
+	this.boss = false;
 }
 Thing.prototype = {
 	render: function(ctx, now, y_scaler, x_ofs) {
@@ -189,7 +194,11 @@ Thing.prototype = {
 		var elapsed = (now - this.start_time);
 		if (this.speed) {
 			elapsed /= this.speed;
-			var x = x_ofs + elapsed;
+			if (this.boss) {
+				var x = x_ofs + canvas.width / layer.x_scale - elapsed * 2;
+			} else {
+				var x = x_ofs + elapsed;
+			}
 		} else {
 			elapsed /= 300;
 			var x = x_ofs + 1;
@@ -219,7 +228,7 @@ Thing.prototype = {
 		ctx.restore();
 		this.pos = [x, y];
 		this.normal = normal;
-		return x < -this.width || x > canvas.width + this.width;
+		return (x < -this.width || x > canvas.width + this.width) && !this.boss;
 	},
 	corners: function() {
 		var ret = [];
@@ -242,10 +251,15 @@ Thing.prototype = {
 
 var player = new Thing(layers[1], 0, "blue", 50, 50, sprites.mastodon);
 player.kills = 0;
+var boss;
 
 var things = [
 	new Thing(layers[0], 1000, "red", 50, 40, sprites.buffalo, 1),
-	new Thing(layers[2], 2000, "red", 50, 40, sprites.buffalo, 1)];
+	new Thing(layers[0], 900, "red", 30, 20, sprites.boar, 1),
+	new Thing(layers[2], 1500, "red", 50, 40, sprites.buffalo, 1),
+	new Thing(layers[2], 1000, "red", 30, 20, sprites.boar, 1),
+	
+];
 	
 function Arrow() {
 	console.assert(this instanceof Arrow);
@@ -303,7 +317,7 @@ Arrow.prototype = {
 };
 var arrows = [];
 
-var start_time, last_spawn_time, last_kill_time, last_kill_layer, mouse_pos;
+var start_time, last_spawn_time, last_boss_time, last_kill_time, last_kill_layer, mouse_pos;
 
 var bow_draw_start, shoulder, hand, bow_azimuth = 0;
 
@@ -333,7 +347,7 @@ function start() {
 		if (pos) { // touchend doens't have any more touch points, so use previous report
 			mouse_pos = [Math.max(canvas.width / 2, pos.clientX), pos.clientY];
 		}
-		if (bow_draw_start && shoulder)
+		if (bow_draw_start && shoulder && get_bow_draw_len() < 0.90)
 			arrows.push(new Arrow());
 		bow_draw_start = null;
 	};
@@ -343,6 +357,7 @@ function start() {
 	player.uid = null;
 	var stats = {
 		game: "LD36",
+		event: "game_start",
 		uid: player.uid,
 	};
 	if (storageAvailable("localStorage")) try {
@@ -354,15 +369,43 @@ function start() {
 	report("info", stats);
 }
 
+function game_over() {
+	report("info", {
+		game: "LD36",
+		event: "game_over",
+		uid: player.uid,
+		score: player.score,
+		kills: player.kills,
+		play_time: (now() - start_time) / 1000,
+		things: things.length,
+	});
+	modal("<big>GAME OVER!</big><hr/><centre>You scored " + player.score + "!<br>" +
+		'<small><u><a onclick="window.location.reload()" style="cursor:pointer">play again?</a></u></small></centre>');
+	setTimeout(function() { window.location.reload(); }, 3000);
+}
+
+function spawn_boss() {
+	if (!boss) {
+		boss = new Thing(layers[1], 1000, "red", 50, 40, sprites.smilodon, 100);
+		boss.boss = true;
+		things.push(boss);
+	}
+}
+
 function spawn() {
 	last_spawn_time = now();
-	if (things.length > 20) return;
+	if (things.length > 20) {
+		if (!last_boss_time || last_spawn_time - last_boss_time > 20000) {
+			spawn_boss();
+		}
+		return;
+	}
 	var mins = new Array(layers.length);
 	// which layer has a thing furthest from the end?
 	for (var thing in things) {
 		thing = things[thing];
 		var layer = layers.indexOf(thing.layer);
-		if (thing.pos && (!mins[layer] || thing.pos[0] < mins[layer][0])) {
+		if (thing.pos && !thing.boss && (!mins[layer] || thing.pos[0] < mins[layer][0])) {
 			mins[layer] = [thing.pos[0], thing, layer];
 		}
 	}
@@ -372,7 +415,7 @@ function spawn() {
 }			
 
 function render() {
-	window.requestAnimationFrame(render);
+	var reqid = window.requestAnimationFrame(render);
 	try {
 		var now = window.now();
 		var elapsed = now - start_time;
@@ -399,7 +442,10 @@ function render() {
 				player.kills++;
 				var stats = {
 					game: "LD36",
+					event: "kill",
+					layer: layers.indexOf(thing.layer),
 					uid: player.uid,
+					kind: thing.sprite.name,
 					kills: player.kills,
 					award: thing.score,
 					score: player.score,
@@ -409,9 +455,13 @@ function render() {
 				report("info", stats);
 			}
 			things.splice(old[idx], 1);
-			thing = thing.clone();
-			thing.speed * 1.1;
-			things.push(thing);
+			if (thing.boss) {
+				boss = null;
+			} else {
+				thing = thing.clone();
+				thing.speed * 1.1;
+				things.push(thing);
+			}
 		}
 		player.render(ctx, now, y_scaler, x_ofs);
 		if (mouse_pos) {
@@ -517,6 +567,10 @@ function render() {
 			ctx.fillText(hints[hint], 10, 10);
 		}
 		ctx.restore();
+		if (boss && boss.pos[0] < player.pos[0]) {
+			window.cancelAnimationFrame(reqid);
+			game_over();
+		}
 	} catch(e) {
 		window.onerror(e.message, e.filename, e.lineno, e.colno, e.error);
 	}
