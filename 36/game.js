@@ -249,7 +249,9 @@ function start() {
 	canvas.ontouchend = canvas.ontouchcancel = canvas.onmouseup = function(evt) {
 		evt.preventDefault();
 		var pos = evt.touches? evt.touches[0]: evt;
-		mouse_pos = [Math.max(canvas.width / 2, pos.clientX), pos.clientY];
+		if (pos) {
+			mouse_pos = [Math.max(canvas.width / 2, pos.clientX), pos.clientY];
+		}
 		if (bow_draw_start && shoulder)
 			arrows.push(new Arrow());
 		bow_draw_start = null;
