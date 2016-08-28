@@ -73,6 +73,11 @@ def _add_to_log(level,ctx,fmt,*args,**kwargs):
 class BaseHandler(tornado.web.RequestHandler):
     CORS = True
     def initialize(self):
+        options = "options"
+        for option in ("get", "post"):
+            if hasattr(self, option):
+                options += ", " + option.upper()
+        self.set_header('Access-Control-Allow-Methods', options)
         if self.CORS:
             origin = self.request.headers.get("Origin")
             if self.is_test() or origin in ("http://williame.github.io", "https://williame.github.io"):
@@ -83,6 +88,8 @@ class BaseHandler(tornado.web.RequestHandler):
                 raise tornado.web.HTTPError(403) # if you fork, get your own server!
     def is_test(self):
         return self.request.remote_ip == "::1"
+    def options(self):
+        self.set_status(204)
     def get_current_user(self):
         session = self.get_secure_cookie("session")
         if not session:
