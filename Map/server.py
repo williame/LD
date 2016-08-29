@@ -161,6 +161,8 @@ class UserHandler(BaseHandler):
             row = db_cursor.execute("SELECT uid, lng, lat FROM users WHERE user_name = ? COLLATE NOCASE", (user_name,)).fetchone()
             if row:
                 uid, position = row[0], {"lng": row[1], "lat": row[2]}
+            else:
+                self.log_info("user has no uid: %s", user_name)
         self.write({"uid": uid, "user_name": user_name, "position": position})
 
 class LoginHandler(BaseHandler):
@@ -171,8 +173,10 @@ class LoginHandler(BaseHandler):
         self.user_name = json.loads(self.request.body)["user_name"]
         if any(ch not in self.legal_chars for ch in self.user_name):
             return self.done(False, "illegal characters in user name")
-        if db_cursor.execute("SELECT 1 FROM users WHERE user_name = ? COLLATE NOCASE", (self.user_name,)).fetchone():
+        row = db_cursor.execute("SELECT uid FROM users WHERE user_name = ? COLLATE NOCASE", (self.user_name,)).fetchone()
+        if row and row[0]:
             return self.done(True, "welcome back!")
+        self.found_user_name = bool(row)
         http = tornado.httpclient.AsyncHTTPClient()
         http.fetch("http://ludumdare.com/compo/author/%s/" % self.user_name, callback=self.on_response)
     def on_response(self, response):
@@ -182,7 +186,10 @@ class LoginHandler(BaseHandler):
             uid = list(set(u for c, u in entries))
             assert len(uid) == 1, uid
             uid = uid[0]
-            db_cursor.execute("INSERT INTO users (uid, user_name) VALUES (?, ?)", (uid, self.user_name,))
+            if self.found_user_name:
+                db_cursor.execute("UPDATE users SET uid = ? WHERE user_name = ? COLLATE NOCASE", (uid, self.user_name))
+            else:
+                db_cursor.execute("INSERT INTO users (uid, user_name) VALUES (?, ?)", (uid, self.user_name))
             db_conn.commit()
             user_name_to_uid[self.user_name.lower()] = uid
             self.done(True)
@@ -191,8 +198,49 @@ class LoginHandler(BaseHandler):
     def done(self, success, note = None):
         if success:
             self.set_secure_cookie("user_name", self.user_name)
+        else:
+            self.log_info("user not found: %s", self.user_name)
         self.write({"note": note})
-        self.finish()        
+        self.finish()       
+        
+class AssociateUidHandler(BaseHandler):
+    regex_author = re.compile(r'\.\./author/([^/]+)')
+    @tornado.web.asynchronous
+    def post(self):
+        body = json.loads(self.request.body)
+        self.user_name = self.get_secure_cookie("user_name")
+        self.event = body["event"]
+        self.uid = body["uid"]
+        if any(ch not in string.digits for ch in self.uid):
+            return self.done(False, "uids are numeric")
+        self.uid = int(self.uid)
+        http = tornado.httpclient.AsyncHTTPClient()
+        http.fetch("http://ludumdare.com/compo/%s/?action=preview&uid=%d" % (self.event, self.uid), callback=self.on_response)
+    def on_response(self, response):
+        if response.error: return self.done(False, "could not find your entry in this competition!")
+        user_name = self.regex_author.findall(response.body)
+        if user_name:
+            user_name = list(set(user_name))
+            assert len(user_name) == 1, user_name
+            user_name = user_name[0]
+            if user_name.lower() != self.user_name.lower():
+                return self.done(False, "that uid belongs to %s!" % user_name)
+            if db_cursor.execute("SELECT 1 FROM users WHERE user_name = ? COLLATE NOCASE", (self.user_name,)).fetchone():
+                db_cursor.execute("UPDATE users SET uid = ? WHERE user_name = ? COLLATE NOCASE", (self.uid, self.user_name))
+            else:
+                db_cursor.execute("INSERT INTO users (uid, user_name) VALUES (?, ?)", (self.uid, self.user_name))
+            db_conn.commit()
+            user_name_to_uid[self.user_name.lower()] = self.uid
+            self.done(True)
+        else:
+            self.done(False, "something went wrong..")
+    def done(self, success, note = None):
+        if success:
+            self.log_info("associated uid %d with username: %s", self.uid, self.user_name)
+        else:
+            self.log_info("could not associate uid %d with username: %s", self.uid, self.user_name)
+        self.write({"note": note})
+        self.finish()       
 
 class LogoutHandler(BaseHandler):
     def get(self):
@@ -243,6 +291,7 @@ if __name__ == "__main__":
     application = tornado.web.Application((
         (r"/api/user", UserHandler),
         (r"/api/login", LoginHandler),
+        (r"/api/associate_uid", AssociateUidHandler),
         (r"/api/logout", LogoutHandler),
         (r"/api/forget", ForgetHandler),
         (r"/api/set_position", SetPositionHandler),

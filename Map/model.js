@@ -191,17 +191,25 @@ function wizard_start(resp) {
 	api("user", function(user) {
 		console.log("got user:", user);
 		window.user = user;
+		var msg = "";
+		if (resp && resp.note) {
+			msg = " <i>(" + resp.note + ")</i>";
+		}
 		if (!user.user_name) {
-			var msg = "";
-			if (resp && resp.note) {
-				msg = " <i>(" + resp.note + ")</i>";
-			}
 			wizard.innerHTML = '<form onsubmit="try { wizard_user_name(this) } catch(error) { window.onerror(error); }; return false">' +
 				'Please enter your Ludum Dare username: ' +
 				'<input type="text" id="user_name" name="user_name"/>' + msg + '</form>' +
 				'<small><u style="cursor: pointer" onclick="play()">I\'d like to browse the map anonymously, thanks</u> / ' +
 						'<u style="cursor: help" onclick="wizard_privacy()">privacy info</u>';
 			document.getElementById("user_name").focus();
+		} else if (!user.uid) {
+			wizard.innerHTML = '<form onsubmit="try { wizard_uid(this) } catch(error) { window.onerror(error); }; return false">' +
+				'Sorry, we can\'t find your uid!  This happens if you never posted an "I\'m In" post to the front page.</br>' +
+				'Please enter your Ludum Dare uid: ' +
+				'<input type="text" id="uid" name="uid"/>' + msg + '</form>' +
+				'<small><u style="cursor: pointer" onclick="play()">I\'d like to browse the map regardless, thanks</u> / ' +
+						'<u style="cursor: help" onclick="wizard_privacy()">privacy info</u>';
+			document.getElementById("uid").focus();
 		} else if (!user.position || (!user.position.lat && !user.position.lng)) {
 			console.log("user has no position", user);
 			api("geoip", function(geoip) {
@@ -241,6 +249,11 @@ function wizard_start(resp) {
 function wizard_user_name(form) {
 	var user_name = form["user_name"].value;
 	api("login", wizard_start, JSON.stringify({"user_name": user_name}), "POST");
+}
+
+function wizard_uid(form) {
+	var uid = form["uid"].value;
+	api("associate_uid", wizard_start, JSON.stringify({"event": event_id, "uid": uid}), "POST");
 }
 
 function wizard_privacy() {
