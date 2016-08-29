@@ -238,7 +238,7 @@ class AssociateUidHandler(BaseHandler):
         if success:
             self.log_info("associated uid %d with username: %s", self.uid, self.user_name)
         else:
-            self.log_info("could not associate uid %d with username: %s", self.uid, self.user_name)
+            self.log_info("could not associate uid %s with username: %s", self.uid, self.user_name)
         self.write({"note": note})
         self.finish()       
 

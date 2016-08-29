@@ -137,6 +137,14 @@ var user = {}, positions = {}, entries = [], known_entries = [], known_user_idx 
 var selected, selected_ghosts, commented = {}, commenter = {}, uid_to_name = {};
 var camera, img_map_topo, img_pin, lines_map, mode;
 
+function report(type, message) {
+	var doc = new XMLHttpRequest();
+	doc.open("POST", "http://" + server + "/api/report_" + type, true);
+	doc.overrideMimeType("text/plain");
+	doc.onerror = function(error) { console.log("could not report " + type +":", server, error, message); };
+	doc.send(JSON.stringify(message));
+}
+
 function init() {
 	console.log("init...");
 	event_id = getParameterByName("event") || "ludum-dare-36";
@@ -144,15 +152,11 @@ function init() {
 	server = (debugging? "localhost": "31.192.226.244") + ":28285"; //### my private server; if you fork, you have to change this
 	window.onerror = function(message, file, line, column, error) {
 		try {
-			if (!(error instanceof Error)) try {
+			if (!error || !error.stack || !(error instanceof Error)) try {
 				throw new Error(JSON.stringify(arguments || []));
 			} catch(e) { error = e;}
 			console.log("error", error, "at", error.stack? error.stack: "?");
-			var doc = new XMLHttpRequest();
-			doc.open("POST", "http://" + server + "/api/report_error", true);
-			doc.overrideMimeType("text/plain");
-			doc.onerror = function(error) { console.log("could not report error:", error); };
-			doc.send(JSON.stringify({ error: error, stack: error.stack}));
+			report("error", { error: error, stack: error.stack? error.stack: null}));
 			if (!debugging && !getParameterByName("debugging")) {
 				window.setTimeout(function() { window.location.reload(false); }, 2500);
 			}
