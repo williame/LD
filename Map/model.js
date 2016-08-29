@@ -38,7 +38,7 @@ var	map_topo_bl = new LatLng(-94, -180).to_mercator(),
 	map_topo_tr = new LatLng(90, 180).to_mercator(); // our map isn't perfectly aligned
 	
 function launch(uid) {
-	report("info", {"launch": uid});
+	report("info", {"launch": uid, user: user});
 	window.open("http://www.ludumdare.com/compo/" + event_id + "/?action=preview&uid=" + uid, "_blank");
 }
 

@@ -156,7 +156,7 @@ function init() {
 				throw new Error(JSON.stringify(arguments || []));
 			} catch(e) { error = e;}
 			console.log("error", error, "at", error.stack? error.stack: "?");
-			report("error", { error: error, stack: error.stack? error.stack: null});
+			report("error", { error: error, stack: error.stack? error.stack: null, user: user});
 			if (!debugging && !getParameterByName("debugging")) {
 				window.setTimeout(function() { window.location.reload(false); }, 2500);
 			}
