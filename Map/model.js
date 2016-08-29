@@ -284,10 +284,19 @@ function wizard_set_position() {
 }
 
 function play() {
-	wizard.style.display = "none";
 	if (user.position)
 		set_position(user.position.to_mercator());
+	wizard.style.display = "none";
 	set_mode("play");
+}
+
+function get_entry_by_uid(uid) {
+	for (var entry in entries) {
+		entry = entries[entry];
+		if (entry.uid == uid)
+			return entry;
+	}
+	return null;
 }
 
 function PinFactory(img) {
@@ -357,8 +366,10 @@ function set_position(mercator) {
 		known_entries[known_user_idx][1] = mercator[1];
 	}
 	if (set_position_first) {
-		set_mode();
-		wizard_set_position();
+		set_mode(mode);
+		if (mode == "set_position") {
+			wizard_set_position();
+		}
 		set_position_first = false;
 	} else {
 		render();
@@ -366,7 +377,7 @@ function set_position(mercator) {
 }
 
 function set_mode(mode) {
-	window.mode = mode = mode || window.mode;
+	window.mode = mode = mode || window.mode || "set_position";
 	console.log("mode", mode);
 	canvas.ondblclick = function(e) {
 		// recentre on point
@@ -580,7 +591,7 @@ function update_map() {
 			var pos = positions[entry.uid];
 			if (pos) {
 				if (user && entry.commenter_ids.indexOf(user.uid) != -1) {
-					commented[user.uid] = 1;
+					commented[entry.uid] = 1;
 				}
 				if (user && entry.uid == user.uid) {
 					for (var other in entry.commenter_ids)
