@@ -351,8 +351,8 @@ function set_position(mercator) {
 	}
 	user.position = pos;
 	if (known_user_idx >= 0) {
-		known_users[known_user_idx][0] = mercator[0];
-		known_users[known_user_idx][1] = mercator[1];
+		known_entries[known_user_idx][0] = mercator[0];
+		known_entries[known_user_idx][1] = mercator[1];
 	}
 	if (set_position_first) {
 		set_mode();
