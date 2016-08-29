@@ -285,6 +285,8 @@ function wizard_set_position() {
 
 function play() {
 	wizard.style.display = "none";
+	if (user.position)
+		set_position(user.position.to_mercator());
 	set_mode("play");
 }
 
