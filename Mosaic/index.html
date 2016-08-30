@@ -140,13 +140,14 @@ function init() {
 	var first = true;
 	loadJSON(ld + "/games.json", function(data) {
 		games = {}; targets = {}; jams = 0;
-		filters = { Web: {}, Windows: {}, Linux: {}, Source: {}};
+		filters = { "Web (incl Unity)": {}, "Web (excl Unity)": {}, Windows: {}, Linux: {}, Source: {}};
 		var web_trivia = {web: 0, unity: 0, fool: 0};
 		for(var i in data) {
 			var game = data[i], uid = game[1];
 			games[uid] = game;
 			if(game[6]) jams++;
-			if(game[8] && !game[9]) filters.Web[uid] = 1;
+			if(game[8]) filters["Web (incl Unity)"][uid] = 1;
+			if(game[8] && !game[9]) filters["Web (excl Unity)"][uid] = 1;
 			if(game[8]) web_trivia.web++;
 			if(game[9]) web_trivia.unity++;
 			if(game[10]) web_trivia.fool++;
@@ -160,7 +161,7 @@ function init() {
 			}
 		}
 		console.log("loaded " + i + " LD" + ld + " games, " + jams + " are jam");
-		console.log(web_trivia)
+		console.log("counts by type", web_trivia)
 		var filter_html = '<i>filters:</i>&nbsp;<button onclick="set_filter()">all&nbsp;(' + objLength(games) + ")</button>&nbsp;";
 		for(var f in filters)
 			filter_html += '<button onclick="set_filter(\'' + f + '\')">' + f + "&nbsp;(" + objLength(filters[f]) + ')</button>&nbsp;';
