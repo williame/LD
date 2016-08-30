@@ -37,9 +37,9 @@ class Game:
 if __name__=="__main__":
     
     opts, args = getopt.getopt(sys.argv[1:],"",
-        ("ld-num=","algo=","target-image=","thumb-width=","patch-width=","skip-json=","comp="))
+        ("ld-num=","algo=","target-image=","thumb-width=","patch-width=","save-json=","comp="))
     opts = dict(opts)
-    ld_nums = opts.get("--ld-num","33")
+    ld_nums = opts.get("--ld-num","36")
     algo = opts.get("--algo","kuhn-munkres")
     save_json = int(opts.get("--save-json","1"))
     if algo not in ("greedy","timed","test","kuhn-munkres"):
@@ -57,7 +57,7 @@ if __name__=="__main__":
     # thumbs not already downloaded?
     index = []
     try: os.makedirs(ld_nums)
-    except IOError: pass
+    except (IOError, OSError): pass
     for ld_num in map(int, ld_nums.split(",")):
         index_file = "%d/games.json"%ld_num 
         if not os.path.exists(index_file):

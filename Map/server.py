@@ -255,7 +255,7 @@ class ForgetHandler(BaseHandler):
             db_cursor.execute("UPDATE users SET lat = NULL, lng = NULL WHERE user_name = ? COLLATE NOCASE", (user_name,))
             db_conn.commit()
             if uid:
-                positions[uid] = [None, None, time.time()]
+                positions[uid] = [None, None, time.time(), None]
         else:
             self.log_warning("cannot forget user");
             
@@ -271,7 +271,7 @@ class SetPositionHandler(BaseHandler):
             db_cursor.execute("UPDATE users SET lat = ?, lng = ? WHERE user_name = ? COLLATE NOCASE", (lat, lng, user_name,))
             db_conn.commit()
             if uid:
-                positions[uid] = [lat, lng, time.time()]
+                positions[uid] = [lat, lng, time.time(), user_name]
         else:
             self.log_warning("cannot set position")
             
