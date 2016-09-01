@@ -386,20 +386,20 @@ function start() {
 	canvas.ontouchstart = canvas.onmousedown = function(evt) {
 		evt.preventDefault();
 		var pos = evt.touches? evt.touches[0]: evt;
-		mouse_pos = [Math.max(canvas.width / 2, pos.clientX), pos.clientY];
+		mouse_pos = [Math.max(boss? 0: canvas.width / 2, pos.clientX), pos.clientY];
 		bow_draw_start = now();
 		if (!hint) hint++;
 	};
 	canvas.ontouchmove = canvas.onmousemove = function(evt) {
 		evt.preventDefault();
 		var pos = evt.touches? evt.touches[0]: evt;
-		mouse_pos = [Math.max(canvas.width / 2, pos.clientX), pos.clientY];
+		mouse_pos = [Math.max(boss? 0: canvas.width / 2, pos.clientX), pos.clientY];
 	};
 	canvas.ontouchend = canvas.ontouchcancel = canvas.onmouseup = function(evt) {
 		evt.preventDefault();
 		var pos = evt.touches? evt.touches[0]: evt;
 		if (pos) { // touchend doens't have any more touch points, so use previous report
-			mouse_pos = [Math.max(canvas.width / 2, pos.clientX), pos.clientY];
+			mouse_pos = [Math.max(boss? 0: canvas.width / 2, pos.clientX), pos.clientY];
 		}
 		if (bow_draw_start && shoulder && get_bow_draw_len() < 0.90)
 			arrows.push(new Arrow());
@@ -513,7 +513,7 @@ function render() {
 					uid: player.uid,
 					kind: thing.sprite.name,
 					kills: player.kills,
-					award: thing.score,
+					award: thing.score * thing.score_multiplier,
 					score: player.score,
 					play_time: elapsed / 1000,
 					things: things.length,
@@ -522,6 +522,8 @@ function render() {
 			}
 			things.splice(old[idx], 1);
 			if (thing.boss) {
+				if (mouse_pos)
+					mouse_pos[0] = Math.max(canvas.width / 2, mouse_pos[0]);
 				boss = null;
 			} else {
 				thing = thing.clone();
