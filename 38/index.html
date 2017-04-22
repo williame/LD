@@ -50,67 +50,14 @@ body { border:0px;margin:0px;padding:0px; background-color: black; color: white;
 
 function game() { //### you replace this!  This is called when the framework has finished loading
 	var loader = Waiter(function() {
-		var setDemo = function(btn, demo) {
-			if(game.demo && game.demo.hide)
-				game.demo.hide();
-			if(game.btn)
-				game.btn.setActive(false);
-			game.demo = demo;
-			if(demo) {
-				demo.layout();
-				demo.show();
-			}
-			game.btn = btn;
-			if(btn)
-				btn.setActive(true);
-		};
 		window.perf = new Perf(128);
-		game.menu = new UIWindow(false,new UIPanel([
-				new UILabel("demos"),
-				new UIButton("platformer",function() { setDemo(this, new DemoPlatformer()); }),
-				new UIButton("platformer+physics", function() { setDemo(this, new DemoPlatformerP2()); }),
-				new UIButton("g3d models",function() { setDemo(this, new DemoG3D()); }),
-				new UIButton("grid terrain",function() { setDemo(this, new DemoGridTerrain()); }, "demo|default"),
-				new UIButton("sphere terrain",function() { setDemo(this, new DemoSphere()); }),
-				new UIButton("noise explorer",function() { setDemo(this, new DemoNoiseExplorer()); }),
-				new UILabel("perf"),
-				new UICheckbox("show fps",function() { window.perf.window().setVisible(this.isChecked()); }),
-				new UICheckbox("640x480", function() {
-					if(this.isChecked()) {
-						window.fixedWidth = 640; window.fixedHeight = 480;
-					} else {
-						window.fixedWidth = 0; window.fixedHeight = 0;
-					}
-					window.onresize();
-				}),
-			],UILayoutRows));
-		game.menu.ctrl.allowClickThru = false;
-		// intercept layouts so we can ensure we are always bottom-left of the screen
-		var layout = game.menu.performLayout;
-		game.menu.performLayout = function() {
-			layout.apply(game.menu,arguments);
-			game.menu.ctrl.setPosVisible([0,canvas.height]);
-		};
-		var resize = game.menu.onResize;
-		game.menu.onResize = function() {
-			resize.apply(game.menu,arguments);
-			game.menu.ctrl.setPosVisible([0,canvas.height]);
-		};
-		game.menu.layout();
-		game.menu.show();
-		// default demo
-		game.menu.find("demo|default").onClicked();
+		var game = new LD38();
+		game.layout();
+		game.show();
 	});
-	loadFile("javascript","barebones.js/quadtree.js",loader());
-	loadFile("javascript","demo_platform.js",loader());
 	loadFile("javascript","barebones.js/g3d.js",loader());
-	loadFile("javascript","demo_g3d.js",loader());
-	loadFile("javascript","demo_grid_terrain.js",loader());
-	loadFile("javascript","demo_sphere.js",loader());
-	loadFile("javascript","barebones.js/perlin_simplex.js",loader());
-	loadFile("javascript","barebones.js/perlin_will.js",loader());
-	loadFile("javascript","demo_noise_explorer.js",loader());
-	loadFile("javascript","demo_platform_p2.js",loader());
+	loadFile("javascript","LD38.js",loader());
+	loadFile("image","data/etopo1.gif",loader());
 }
 
 function onVisibilityChange(evt, is_visible) {

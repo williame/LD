@@ -38,6 +38,7 @@ from tornado.options import define, options, parse_command_line
 
 options.define("port",default=8888,type=int)
 options.define("branch",default="HEAD")
+options.define("base",default=".")
 options.define("enable_upload",default=None,multiple=True,type=str)
 options.define("access",type=str,multiple=True)
 options.define("index_path",type=str,default="index.html")
@@ -80,7 +81,7 @@ class BaseHandler(tornado.web.RequestHandler):
         path = os.path.abspath(path)
         if os.path.commonprefix([path,home]) != home:
             raise tornado.web.HTTPError(403)
-        return os.path.relpath(path,home)
+        return os.path.join(options.base, os.path.relpath(path,home))
     def write_error(self,status_code,**kwargs):
         if status_code == 401:
             self.set_header("WWW-Authenticate","Basic realm=Restricted")
@@ -116,6 +117,7 @@ class MainHandler(BaseHandler):
                 with open(path,"rb") as f:
                     body = f.read()
             except IOError as e:
+                self.log(logging.WARNING,"cannot read %s",path)
                 pass
         if not body:
             try:
