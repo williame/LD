@@ -2,7 +2,7 @@
 function LD38() {
 	UIViewport.call(this,this);
 	this.map = null;
-	this.flat_shading = true;
+	this.flat_shading = false;
 	this.vary_height = true;
 	this.tile = false;
 	this.camera = {
@@ -16,7 +16,7 @@ function LD38() {
 		lightDir: [0.2, 0.2, -1],
 		ambientLight: [0.3, 0.3, 0.3],
 		fogColour: [1,1,0.8,1],
-		texture: getFile("image", "data/etopo1.gif"),
+		texture: getFile("image", "data/1280px-World_Ocean_Current.ja.jpg"),
 		fogDensity: 0.02,
 		pMatrix: null,
 		mvMatrix: null,
