@@ -49,7 +49,6 @@ LD38.prototype = {
 			gl.vertexAttribPointer(program.normal, 3, gl.FLOAT, false, 8*4, 3*4);
 			gl.vertexAttribPointer(program.texCoord, 2, gl.FLOAT, false, 8*4, 6*4);
 			gl.drawArrays(gl.TRIANGLES, 0, self.map.vCount);
-			gl.uniform4fv(program.colour, [1, 0, 0, 255]);
 			gl.bindTexture(gl.TEXTURE_2D,programs.blankTex);
 			gl.drawArrays(gl.LINES, 0, self.map.vCount);
 			gl.bindBuffer(gl.ARRAY_BUFFER,null);
@@ -68,8 +67,26 @@ LD38.prototype = {
 		this.layout();
 		this.uniforms.pMatrix = new Float32Array(createPerspective(30.0, canvas.width/canvas.height, 0.01, 30));
 	},
-	onMouseDown: function(e) {
-		console.log("aha", e);
+	onMouseDown: function(evt) {
+		var line = this.mouseRay(evt);
+		var vertices = this.map.vertices;
+		var best = -1, best_dist = Number.MAX_SAFE_INTEGER;
+		for (var v in vertices) {
+			var vertex = vertices[v];
+			var pt = vec3_line_nearest(vertex, line);
+			var dist = vec3_distance_sqrd(pt, vertex);
+			if (dist < best_dist) {
+				best = v;
+				best_dist = dist;
+			}
+		}
+		console.log("nearest:", best, best_dist);
+	},
+	uvMapping: function(pt) {
+		pt = vec3_normalise(pt);
+		var u = 0.5 + Math.atan2(pt[2], pt[0]) / (Math.PI * 2);
+		var v = 0.5 - Math.asin(pt[1]) / Math.PI;
+		return [u, v];
 	},
 	makeMap: function() {
 		var iterations = this.iterations;
@@ -124,8 +141,8 @@ LD38.prototype = {
 		bisect(bottom,rightBack,leftBack,0);
 		// now we have a unit icosphere...
 		// make some a different height
-		var HEIGHT = 0.05;
 		if (this.vary_height) {
+			var HEIGHT = 0.05;
 			for (var i=0; i<heights.length; i+=(Math.random()*5)|1)
 				heights[i] = HEIGHT;
 			// fill in any voids
@@ -160,18 +177,12 @@ LD38.prototype = {
 				d[0], d[1], d[2], n[0], n[1], n[2], 0, 0, 
 				c[0], c[1], c[2], n[0], n[1], n[2], 0, 0);
 		};
-		var texcoord = function(pt) {
-			pt = vec3_normalise(pt);
-			var u = 0.5 + Math.atan2(pt[2], pt[0]) / (Math.PI * 2);
-			var v = 0.5 - Math.asin(pt[1]) / Math.PI;
-			return [u, v];
-		};
 		for (var i=0; i<heights.length; i++) {
 			var height = heights[i];
 			var A = indices[i*3 + 0], a = vertices[A],
 				B = indices[i*3 + 1], b = vertices[B],
 				C = indices[i*3 + 2], c = vertices[C];
-			var ta = texcoord(a), tb = texcoord(b), tc = texcoord(c);
+			var ta = this.uvMapping(a), tb = this.uvMapping(b), tc = this.uvMapping(c);
 			if (height) {
 				a = vec3_scale(a, 1 + height);
 				b = vec3_scale(b, 1 + height);
@@ -204,6 +215,12 @@ LD38.prototype = {
 		var map = {
 			vVbo: gl.createBuffer(),
 			vCount: triangles.length / 8,
+			vertices: vertices,
+			vIndex: vIndex,
+			indices: indices,
+			edges: edges,
+			heights: heights,
+			triangles: triangles,
 		};
 		gl.bindBuffer(gl.ARRAY_BUFFER, map.vVbo);
 		gl.bufferData(gl.ARRAY_BUFFER, triangles, gl.STATIC_DRAW);
