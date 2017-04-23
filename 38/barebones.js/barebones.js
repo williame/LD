@@ -67,7 +67,7 @@ var fail = fail || function(error) {
 }
 
 function report_error(message) {
-	if(isOnFileSystem()) return;
+	if(isOnFileSystem() || isOnGithubPages(getServerHost())) return;
 	var doc = new XMLHttpRequest();
 	doc.open("POST","http://"+getServerHost()+"/api/report_error",false);
 	doc.overrideMimeType("text/plain");
@@ -76,7 +76,7 @@ function report_error(message) {
 }
 
 function report_info(message) {
-	if(isOnFileSystem()) return;
+	if(isOnFileSystem() || isOnGithubPages(getServerHost())) return;
 	var doc = new XMLHttpRequest();
 	doc.open("POST","http://"+getServerHost()+"/api/report_info",false);
 	doc.overrideMimeType("text/plain");

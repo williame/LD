@@ -1,5 +1,7 @@
-function isOnGithubPages() {
-	return window.location.hostname.indexOf(".github.") > 0;
+function isOnGithubPages(url) {
+	if (!url) 
+		url = window.location.hostname;
+	return url.indexOf(".github.") > 0;
 }
 
 function isOnFileSystem() {
