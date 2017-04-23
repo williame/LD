@@ -2,21 +2,20 @@
 function LD38() {
 	UIViewport.call(this,this);
 	this.map = null;
-	this.flat_shading = false;
-	this.vary_height = true;
-	this.tile = false;
+	this.flat_shading = true;
+	this.vary_height = false;
 	this.camera = {
 		centre: [0, 0, 0],
 		up: vec3_normalise([0, 1, 1]),
 		eye: [3, 1, 0],
 	};
 	this.uniforms = {
-		colour: [0.95, 0.95, 0.7, 1],
+		colour: [1, 1, 1, 1],
 		lightColour: [1, 0.95, 1],
 		lightDir: [0.2, 0.2, -1],
 		ambientLight: [0.3, 0.3, 0.3],
 		fogColour: [1,1,0.8,1],
-		texture: getFile("image", "data/1280px-World_Ocean_Current.ja.jpg"),
+		texture: getFile("image", "data/world_physical_enhanced_pacific_giclee_lg.jpg"),
 		fogDensity: 0.02,
 		pMatrix: null,
 		mvMatrix: null,
@@ -36,7 +35,7 @@ LD38.prototype = {
 		gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
 		// spin the sphere
 		var elapsed = now()-this.lastTick;
-		this.camera.eye = vec3_rotate(this.camera.eye, elapsed / 10000, this.camera.centre, vec3_add(this.camera.centre, this.camera.up));
+		//this.camera.eye = vec3_rotate(this.camera.eye, elapsed / 10000, this.camera.centre, vec3_add(this.camera.centre, this.camera.up));
 		this.lastTick += elapsed;
 		this.uniforms.mvMatrix = createLookAt(this.camera.eye, this.camera.centre, this.camera.up);
 		// and draw it
@@ -47,6 +46,9 @@ LD38.prototype = {
 			gl.vertexAttribPointer(program.normal, 3, gl.FLOAT, false, 8*4, 3*4);
 			gl.vertexAttribPointer(program.texCoord, 2, gl.FLOAT, false, 8*4, 6*4);
 			gl.drawArrays(gl.TRIANGLES, 0, self.map.vCount);
+			gl.uniform4fv(program.colour, [1, 0, 0, 255]);
+			gl.bindTexture(gl.TEXTURE_2D,programs.blankTex);
+			gl.drawArrays(gl.LINES, 0, self.map.vCount);
 			gl.bindBuffer(gl.ARRAY_BUFFER,null);
 		}, this.uniforms);
 	},
@@ -62,6 +64,9 @@ LD38.prototype = {
 		this.setSize([canvas.width, canvas.height]);
 		this.layout();
 		this.uniforms.pMatrix = new Float32Array(createPerspective(30.0, canvas.width/canvas.height, 0.01, 30));
+	},
+	onMouseDown: function(e) {
+		console.log("aha", e);
 	},
 	makeMap: function() {
 		var iterations = this.iterations;
