@@ -15,7 +15,6 @@ function LD38() {
 		lightDir: [0.2, 0.2, -1],
 		ambientLight: [0.3, 0.3, 0.3],
 		fogColour: [1,1,0.8,1],
-		texture: getFile("image", "data/world_physical_enhanced_pacific_giclee_lg.jpg"),
 		fogDensity: 0.02,
 		pMatrix: null,
 		mvMatrix: null,
@@ -26,6 +25,10 @@ function LD38() {
 	this.win = new UIWindow(false, this); // a window to host this viewport in
 	this.iterations = 4;
 	this.map = this.makeMap();
+	var self = this;
+	loadFile("image","data/world_physical_enhanced_pacific_giclee_lg.jpg", function(tex) {
+			self.uniforms.texture = tex;
+	});
 }
 
 LD38.prototype = {
