@@ -51,7 +51,13 @@ function LD38() {
 		vbo: gl.createBuffer(),
 		count: 0,
 		shown: {},
+		exposed: 0,
 		triangles: [],
+	};
+	this.flags = {
+		vbo: gl.createBuffer(),
+		count: 0,
+		flags: {},
 	};
 	this.highlight = {
 		vbo: gl.createBuffer(),
@@ -116,6 +122,15 @@ LD38.prototype = {
 				gl.bindBuffer(gl.ARRAY_BUFFER,null);
 			}, this.uniforms);
 		}
+		if (this.flags.count) {
+			programs.solidFill(function(program) {
+				gl.uniform4fv(program.colour, [0, 1, 1, 1]);
+				gl.bindBuffer(gl.ARRAY_BUFFER, self.flags.vbo);
+				gl.vertexAttribPointer(program.vertex, 3, gl.FLOAT, false, 3*4, 0);
+				gl.drawArrays(gl.TRIANGLES, 0, self.flags.count);
+				gl.bindBuffer(gl.ARRAY_BUFFER,null);
+			}, this.uniforms);
+		}
 		if (this.highlight.count) {
 			programs.solidFill(function(program) {
 				gl.bindBuffer(gl.ARRAY_BUFFER, self.highlight.vbo);
@@ -161,40 +176,67 @@ LD38.prototype = {
 		}
 		this.setHighlight(best);
 	},
+	onKeyDown: function(evt) {
+		if (keys[27])
+			this.showMenu(false,false);
+	},
 	onMouseDown: function(evt) {
 		var t = this.highlight.hit;
 		if (t == -1)
 			return;
-		var open = [t],
-			map = this.map,
+		var	map = this.map,
 			triangles = map.triangles,
 			neighbours = map.neighbours,
 			vertices = map.vertices,
-			overlay = this.overlay;
-		while (open.length) {
-			var t = open.pop();
+			overlay = this.overlay,
+			flags = this.flags;
+		if (evt.which == 3) {
 			if (t in overlay.shown)
-				continue;
-			overlay.shown[t] = 1;
-			var type = this.minefield.field[t];
-			var tri = triangles[t],
-				a = vertices[tri[0]], b = vertices[tri[1]], c = vertices[tri[2]],
-				colour = this.colours[type == "M"? type: Math.min(type, 6)];
-			overlay.triangles.push(
-				a[0], a[1], a[2], colour[0], colour[1], colour[2],
-				c[0], c[1], c[2], colour[0], colour[1], colour[2],
-				b[0], b[1], b[2], colour[0], colour[1], colour[2]);
-			if (type === 0) {
-				for (c=0; c<3; c++)
-					open = open.concat(neighbours[tri[c]]);
-			} else if (type == "M") {
-				console.log("BOOM!");
+				return;
+			flags.flags[t] = t in flags.flags? !flags.flags[t]: 1;
+			var buf = [];
+			for (var t in flags.flags) {
+				if (flags.flags[t]) {
+					var tri = triangles[t],
+						a = vertices[tri[0]], b = vertices[tri[1]], c = vertices[tri[2]];
+					buf.push(a[0], a[1], a[2], c[0], c[1], c[2], b[0], b[1], b[2]);
+				}
 			}
-			overlay.count += 3;
+			flags.count = buf.length / 3;
+			gl.bindBuffer(gl.ARRAY_BUFFER, flags.vbo);
+			gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(buf), gl.STATIC_DRAW);
+			gl.bindBuffer(gl.ARRAY_BUFFER, null);
+		} else {
+			if (flags.flags[t])
+				return;
+			var open = [t];
+			while (open.length) {
+				var t = open.pop();
+				if (t in overlay.shown)
+					continue;
+				overlay.shown[t] = 1;
+				overlay.exposed += 1;
+				var type = this.minefield.field[t];
+				var tri = triangles[t],
+					a = vertices[tri[0]], b = vertices[tri[1]], c = vertices[tri[2]],
+					colour = this.colours[type == "M"? type: Math.min(type, 6)];
+				overlay.triangles.push(
+					a[0], a[1], a[2], colour[0], colour[1], colour[2],
+					c[0], c[1], c[2], colour[0], colour[1], colour[2],
+					b[0], b[1], b[2], colour[0], colour[1], colour[2]);
+				if (type === 0) {
+					for (c=0; c<3; c++)
+						open = open.concat(neighbours[tri[c]]);
+				}
+				overlay.count += 3;
+			}
+			gl.bindBuffer(gl.ARRAY_BUFFER, overlay.vbo);
+			gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(overlay.triangles), gl.STATIC_DRAW);
+			gl.bindBuffer(gl.ARRAY_BUFFER, null);
+			if (this.minefield.field[t] == "M") {
+				this.showMenu(true, true);
+			}
 		}
-		gl.bindBuffer(gl.ARRAY_BUFFER, this.overlay.vbo);
-		gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(this.overlay.triangles), gl.STATIC_DRAW);
-		gl.bindBuffer(gl.ARRAY_BUFFER, null);
 		this.setHighlight();
 		this.setHighlight(t);
 	},
@@ -382,8 +424,8 @@ LD38.prototype = {
 				b[0], b[1], b[2]]), gl.STATIC_DRAW);
 			gl.bindBuffer(gl.ARRAY_BUFFER, null);
 			this.highlight.count = 3;
-			var type = this.minefield.field[t];
-			if (type !== 0 && t in this.overlay.shown) {
+			var type = this.flags.flags[t]? "?": this.minefield.field[t];
+			if (type !== 0 && (t in this.overlay.shown || type == "?")) {
 				var label =  this.toolTip.find("label");
 				label.setText("" + type);
 				this.toolTip.ctrl.setPos(mousePos);
@@ -417,15 +459,35 @@ LD38.prototype = {
 				}
 			}
 		}
+		var count = 0;
 		for (i=0; i<field.length; i++) {
-			if (field[i] != "M")
+			if (field[i] != "M") {
 				field[i] = field[i].length;
+				count++;
+			}
 		}
 		return {
 			n: n,
 			mines: mines,
 			field: field,
+			count: count,
 		};
+	},
+	showMenu: function(newGame, lostGame) {
+		var menu,
+			ctrls = [];
+		if (lostGame)
+			ctrls.push(new UILabel("sorry you hit a mine!", OPAQUE));
+		ctrls.push(new UIButton("new game: smallest", function() { window.location = "?level=2"; }));
+		ctrls.push(new UIButton("new game: small", function() { window.location = "?level=3"; }));
+		ctrls.push(new UIButton("new game: medium", function() { window.location = "?level=4"; }));
+		ctrls.push(new UIButton("new game: hard", function() { window.location = "?level=5"; }));
+		ctrls.push(new UIButton("new game: crazy", function() { window.location = "?level=6"; }));
+		if (!newGame)
+			ctrls.push(new UIButton("resume current game", function() { menu.hide(); }));
+		var panel = new UIPanel(ctrls, UILayoutRows);
+		menu = new UIWindow(true, panel);
+		menu.show();
 	},
 }
 
