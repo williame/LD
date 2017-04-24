@@ -44,7 +44,8 @@ function LD38() {
 	this.lastTick = now();
 	this.tool = null;
 	this.win = new UIWindow(false, this); // a window to host this viewport in
-	this.iterations = Math.max(2, parseInt(getParameterByName("level")) || 0);
+	this.level = parseInt(getParameterByName("level"));
+	this.iterations = Math.max(2, isNaN(this.level) ? 4: this.level);
 	this.map = this.makeMap();
 	this.minefield = this.makeMinefield((this.map.triangles.length / 10)|0);
 	this.overlay = {
@@ -67,6 +68,12 @@ function LD38() {
 	};
 	this.zoomDiff = 1;
 	this.toolTip = new UIWindow(false, new UIPanel([new UILabel("", OPAQUE, "label")]));
+	if (isNaN(this.level)) {
+		this.showMenu(true, false);
+	} else {
+		UI.addMessage(10, null, "LEFT CLICK to expose the minefield", "help1");
+		UI.addMessage(11, null, "RIGHT CLICK to mark a probable mine", "help2");
+	}
 }
 
 LD38.prototype = {
@@ -89,10 +96,10 @@ LD38.prototype = {
 		this.lastTick += elapsed;
 		var scroll_speed = 1000;
 		if(keys[37] && !keys[39]) { // left
-			this.camera.eye = vec3_rotate(this.camera.eye, elapsed / scroll_speed, this.camera.centre, vec3_add(this.camera.centre, this.camera.up));
+			this.camera.eye = vec3_rotate(this.camera.eye, -elapsed / scroll_speed, this.camera.centre, vec3_add(this.camera.centre, this.camera.up));
 			this.setHighlight();
 		} else if(keys[39] && !keys[37]) { // right
-			this.camera.eye = vec3_rotate(this.camera.eye, -elapsed / scroll_speed, this.camera.centre, vec3_add(this.camera.centre, this.camera.up));
+			this.camera.eye = vec3_rotate(this.camera.eye, elapsed / scroll_speed, this.camera.centre, vec3_add(this.camera.centre, this.camera.up));
 			this.setHighlight();
 		} if(keys[38] && !keys[40]) { // up
 			this.camera.eye = vec3_rotate(this.camera.eye, elapsed / scroll_speed, this.camera.centre, vec3_add(this.camera.centre, this.camera.right));
@@ -109,8 +116,10 @@ LD38.prototype = {
 			gl.vertexAttribPointer(program.normal, 3, gl.FLOAT, false, 8*4, 3*4);
 			gl.vertexAttribPointer(program.texCoord, 2, gl.FLOAT, false, 8*4, 6*4);
 			gl.drawArrays(gl.TRIANGLES, 0, self.map.count);
-			gl.bindTexture(gl.TEXTURE_2D,programs.blankTex);
-			gl.drawArrays(gl.LINES, 0, self.map.count);
+			if (!isNaN(self.level)) {
+				gl.bindTexture(gl.TEXTURE_2D,programs.blankTex);
+				gl.drawArrays(gl.LINES, 0, self.map.count);
+			}
 			gl.bindBuffer(gl.ARRAY_BUFFER,null);
 		}, this.uniforms);
 		if (this.overlay.count) {
@@ -206,6 +215,7 @@ LD38.prototype = {
 			gl.bindBuffer(gl.ARRAY_BUFFER, flags.vbo);
 			gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(buf), gl.STATIC_DRAW);
 			gl.bindBuffer(gl.ARRAY_BUFFER, null);
+			UI.removeMessage("help2");
 		} else {
 			if (flags.flags[t])
 				return;
@@ -233,6 +243,7 @@ LD38.prototype = {
 			gl.bindBuffer(gl.ARRAY_BUFFER, overlay.vbo);
 			gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(overlay.triangles), gl.STATIC_DRAW);
 			gl.bindBuffer(gl.ARRAY_BUFFER, null);
+			UI.removeMessage("help1");
 			if (this.minefield.field[t] == "M") {
 				this.showMenu(true, true);
 			}
@@ -402,7 +413,7 @@ LD38.prototype = {
 		gl.bindBuffer(gl.ARRAY_BUFFER, map.vbo);
 		gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(output), gl.STATIC_DRAW);
 		gl.bindBuffer(gl.ARRAY_BUFFER, null);
-		console.log(iterations,"iterations = ",heights.length,"triangles,",vertices.length,"vertices");
+		console.log(iterations,"iterations = ",count,"triangles,",vertices.length,"vertices");
 		return map;
 	},
 	setHighlight: function(t) {
@@ -486,7 +497,10 @@ LD38.prototype = {
 		if (!newGame)
 			ctrls.push(new UIButton("resume current game", function() { menu.hide(); }));
 		var panel = new UIPanel(ctrls, UILayoutRows);
+		UIViewport.prototype.layout.call(this);
 		menu = new UIWindow(true, panel);
+		menu.performLayout();
+		menu.ctrl.setPosVisible([(canvas.width - panel.width()) / 2, (canvas.height - panel.height()) / 2]); // bottom-right
 		menu.show();
 	},
 }
