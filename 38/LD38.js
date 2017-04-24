@@ -1,12 +1,15 @@
+"use strict";
 
 function LD38() {
 	UIViewport.call(this,this);
+	var self = this;
 	this.map = null;
 	this.flat_shading = true;
 	this.vary_height = false;
 	this.camera = {
 		centre: [0, 0, 0],
 		up: vec3_normalise([0, 1, 1]),
+		right: vec3_normalise([1, 0, 1]),
 		eye: [3, 1, 0],
 	};
 	this.uniforms = {
@@ -19,40 +22,88 @@ function LD38() {
 		pMatrix: null,
 		mvMatrix: null,
 	};
+	loadFile("image","data/world_physical_enhanced_pacific_giclee_lg.jpg", function(tex) {
+			self.uniforms.texture = tex;
+	});
+	this.program = Program(
+		"precision mediump float;\n"+
+		"attribute vec3 vertex;\n"+
+		"attribute vec3 colour;\n"+
+		"varying vec3 vertex_colour;\n"+
+		"uniform mat4 mvMatrix, pMatrix;\n"+
+		"void main() {\n"+
+		"	gl_Position = pMatrix * mvMatrix * vec4(vertex,1.0);\n"+
+		"	vertex_colour = colour;\n"+
+		"}\n",
+		"precision mediump float;\n"+
+		"varying vec3 vertex_colour;\n"+
+		"void main() {\n"+
+		"	gl_FragColor = vec4(vertex_colour, 1.0);\n"+
+		"}\n");
 	this.win = new UIWindow(false,this); // a window to host this viewport in
 	this.lastTick = now();
 	this.tool = null;
 	this.win = new UIWindow(false, this); // a window to host this viewport in
-	this.iterations = 4;
+	this.iterations = 2;
 	this.map = this.makeMap();
-	var self = this;
-	loadFile("image","data/world_physical_enhanced_pacific_giclee_lg.jpg", function(tex) {
-			self.uniforms.texture = tex;
-	});
+	this.minefield = this.makeMinefield((this.map.triangles.length / 10)|0);
+	this.overlay = {
+		vbo: gl.createBuffer(),
+		count: 0,
+		shown: {},
+		triangles: [],
+	};
 }
 
 LD38.prototype = {
 	__proto__: UIViewport.prototype,
+	colours: {
+		0:	[1, 1, 1],
+		1:	[0.8, 0.8, 0.8],
+		2:	[0.7, 0.7, 0.7],
+		3:	[0.6, 0.6, 0.6],
+		4:	[0.5, 0.5, 0.5],
+		5:	[0.4, 0.4, 0.4],
+		6:	[0.3, 0.3, 0.3],
+		"M":[1, 0, 0],
+	},
 	render: function(ctx) {
 		gl.clearColor(0.25, 0.3, 0.2, 1);
 		gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
 		// spin the sphere
 		var elapsed = now()-this.lastTick;
-		//this.camera.eye = vec3_rotate(this.camera.eye, elapsed / 10000, this.camera.centre, vec3_add(this.camera.centre, this.camera.up));
 		this.lastTick += elapsed;
-		this.uniforms.mvMatrix = createLookAt(this.camera.eye, this.camera.centre, this.camera.up);
+		var scroll_speed = 1000;
+		if(keys[37] && !keys[39]) // left
+			this.camera.eye = vec3_rotate(this.camera.eye, elapsed / scroll_speed, this.camera.centre, vec3_add(this.camera.centre, this.camera.up));
+		else if(keys[39] && !keys[37]) // right
+			this.camera.eye = vec3_rotate(this.camera.eye, -elapsed / scroll_speed, this.camera.centre, vec3_add(this.camera.centre, this.camera.up));
+		if(keys[38] && !keys[40]) // up
+			this.camera.eye = vec3_rotate(this.camera.eye, elapsed / scroll_speed, this.camera.centre, vec3_add(this.camera.centre, this.camera.right));
+		else if(keys[40] && !keys[38]) // down
+			this.camera.eye = vec3_rotate(this.camera.eye, -elapsed / scroll_speed, this.camera.centre, vec3_add(this.camera.centre, this.camera.right));
 		// and draw it
+		this.uniforms.mvMatrix = createLookAt(this.camera.eye, this.camera.centre, this.camera.up);
 		var self = this;
 		programs.standard(function(program) {
-			gl.bindBuffer(gl.ARRAY_BUFFER, self.map.vVbo);
+			gl.bindBuffer(gl.ARRAY_BUFFER, self.map.vbo);
 			gl.vertexAttribPointer(program.vertex, 3, gl.FLOAT, false, 8*4, 0);
 			gl.vertexAttribPointer(program.normal, 3, gl.FLOAT, false, 8*4, 3*4);
 			gl.vertexAttribPointer(program.texCoord, 2, gl.FLOAT, false, 8*4, 6*4);
-			gl.drawArrays(gl.TRIANGLES, 0, self.map.vCount);
+			gl.drawArrays(gl.TRIANGLES, 0, self.map.count);
 			gl.bindTexture(gl.TEXTURE_2D,programs.blankTex);
-			gl.drawArrays(gl.LINES, 0, self.map.vCount);
+			gl.drawArrays(gl.LINES, 0, self.map.count);
 			gl.bindBuffer(gl.ARRAY_BUFFER,null);
 		}, this.uniforms);
+		if (this.overlay.count) {
+			this.program(function(program) {
+				gl.bindBuffer(gl.ARRAY_BUFFER, self.overlay.vbo);
+				gl.vertexAttribPointer(program.vertex, 3, gl.FLOAT, false, 6*4, 0);
+				gl.vertexAttribPointer(program.colour, 3, gl.FLOAT, false, 6*4, 3*4);
+				gl.drawArrays(gl.TRIANGLES, 0, self.overlay.count);
+				gl.bindBuffer(gl.ARRAY_BUFFER,null);
+			}, this.uniforms);
+		}
 	},
 	show: function() {
 		this.onResize();
@@ -68,19 +119,51 @@ LD38.prototype = {
 		this.uniforms.pMatrix = new Float32Array(createPerspective(30.0, canvas.width/canvas.height, 0.01, 30));
 	},
 	onMouseDown: function(evt) {
-		var line = this.mouseRay(evt);
-		var vertices = this.map.vertices;
-		var best = -1, best_dist = Number.MAX_SAFE_INTEGER;
-		for (var v in vertices) {
-			var vertex = vertices[v];
-			var pt = vec3_line_nearest(vertex, line);
-			var dist = vec3_distance_sqrd(pt, vertex);
-			if (dist < best_dist) {
-				best = v;
-				best_dist = dist;
+		var line = this.mouseRay(evt),
+			ray_origin = line[0],
+			ray_dir = vec3_sub(line[1], line[0]),
+			map = this.map,
+			vertices = map.vertices,
+			triangles = map.triangles,
+			best = -1, best_dist = Number.MAX_SAFE_INTEGER;
+		for (var t in triangles) {
+			var tri = triangles[t],
+				a = vertices[tri[0]], b = vertices[tri[1]], c = vertices[tri[2]], n = tri[3],
+				hit = triangle_ray_intersection(a, c, b, ray_origin, ray_dir, n, true, false);
+			if (hit && (best == -1 || hit[0] < best_dist)) {
+				best = t;
+				best_dist = hit[0];
 			}
 		}
-		console.log("nearest:", best, best_dist);
+		if (best == -1)
+			return;
+		var open = [best],
+			overlay = this.overlay,
+			neighbours = map.neighbours;
+		while (open.length) {
+			var t = open.pop();
+			if (t in overlay.shown)
+				continue;
+			overlay.shown[t] = 1;
+			var type = this.minefield.field[t];
+			var tri = triangles[t],
+				a = vertices[tri[0]], b = vertices[tri[1]], c = vertices[tri[2]],
+				colour = this.colours[type];
+			overlay.triangles.push(
+				a[0], a[1], a[2], colour[0], colour[1], colour[2],
+				c[0], c[1], c[2], colour[0], colour[1], colour[2],
+				b[0], b[1], b[2], colour[0], colour[1], colour[2]);
+			if (type === 0) {
+				for (c=0; c<3; c++)
+					open = open.concat(neighbours[tri[c]]);
+			} else if (type == "M") {
+				console.log("BOOM!");
+			}
+			overlay.count += 3;
+		}
+		gl.bindBuffer(gl.ARRAY_BUFFER, this.overlay.vbo);
+		gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(this.overlay.triangles), gl.STATIC_DRAW);
+		gl.bindBuffer(gl.ARRAY_BUFFER, null);
 	},
 	uvMapping: function(pt) {
 		pt = vec3_normalise(pt);
@@ -92,11 +175,13 @@ LD38.prototype = {
 		var iterations = this.iterations;
 		// (my old blog post: http://williamedwardscoder.tumblr.com/post/36660467688/rendering-spheres-with-triangles )
 		// first we make an icosphere
-		var	vertices = [],
-			vIndex = {},
+		var	self = this,
+			vertices = [],
+			index = {},
 			indices = [],
 			edges = {},
 			heights = [],
+			neighbours = [],
 			addTriangle = function(a, b, c) {
 				edges[a+","+b] = edges[b+","+c] = edges[c+","+a] = heights.length;
 				heights.push(0);
@@ -105,11 +190,12 @@ LD38.prototype = {
 			addVertex = function(v) {
 				var key = vec3_scale(v, 10000); // round by this much to avoid floating point errors
 				key = [key[0]|0, key[1]|0, key[2]|0];
-				if(!(key in vIndex)) {
-					vIndex[key] = vertices.length;
+				if(!(key in index)) {
+					index[key] = vertices.length;
 					vertices.push(v);
+					neighbours.push([]);
 				}
-				return vIndex[key];
+				return index[key];
 			},
 			halfway = function(a, b) {
 				a = vertices[a];
@@ -164,25 +250,33 @@ LD38.prototype = {
 			} while(changed);
 		}
 		// turn into triangles
-		var triangles = [];
-		var addFace = function(A, B, a, b) {
+		var count = 0, output = [], triangles = [], adjacency = {};
+		var addFlatFace = function(A, B, a, b) {
 			var c = vertices[A],
 				d = vertices[B];
 			var n = triangle_normal(c, b, a);
-			triangles.push(
+			output.push(
 				a[0], a[1], a[2], n[0], n[1], n[2], 0, 0,
 				b[0], b[1], b[2], n[0], n[1], n[2], 0, 0, 
 				c[0], c[1], c[2], n[0], n[1], n[2], 0, 0,
 				b[0], b[1], b[2], n[0], n[1], n[2], 0, 0,
 				d[0], d[1], d[2], n[0], n[1], n[2], 0, 0, 
 				c[0], c[1], c[2], n[0], n[1], n[2], 0, 0);
+			triangles.push(null, null);
+			count += 2;
+		};
+		var add_adjacency = function(A, B) {
+			var key = self.get_adjacency_key(A, B);
+			if (key in adjacency)
+				adjacency[key].push(count);
+			else
+				adjacency[key] = [count];
 		};
 		for (var i=0; i<heights.length; i++) {
-			var height = heights[i];
 			var A = indices[i*3 + 0], a = vertices[A],
 				B = indices[i*3 + 1], b = vertices[B],
 				C = indices[i*3 + 2], c = vertices[C];
-			var ta = this.uvMapping(a), tb = this.uvMapping(b), tc = this.uvMapping(c);
+			var height = heights[i];
 			if (height) {
 				a = vec3_scale(a, 1 + height);
 				b = vec3_scale(b, 1 + height);
@@ -193,39 +287,102 @@ LD38.prototype = {
 					assert(!isNaN(ab));
 					assert(!isNaN(bc));
 					assert(!isNaN(ca));
-				if (ab < height) addFace(A, B, a, b);
-				if (bc < height) addFace(B, C, b, c);
-				if (ca < height) addFace(C, A, c, a);
+				if (ab < height) addFlatFace(A, B, a, b);
+				if (bc < height) addFlatFace(B, C, b, c);
+				if (ca < height) addFlatFace(C, A, c, a);
 			}
+			var ta = this.uvMapping(a), tb = this.uvMapping(b), tc = this.uvMapping(c);
+			var n = triangle_normal(a,b,c);
 			if (this.flat_shading) {
-				var n = triangle_normal(a,b,c);
-				triangles.push(
+				output.push(
 					a[0], a[1], a[2], n[0], n[1], n[2], ta[0], ta[1],
 					c[0], c[1], c[2], n[0], n[1], n[2], tc[0], tc[1],
 					b[0], b[1], b[2], n[0], n[1], n[2], tb[0], tb[1]);
 			} else {
-				triangles.push(
+				output.push(
 					a[0], a[1], a[2], -a[0], -a[1], -a[2], ta[0], ta[1],
 					c[0], c[1], c[2], -c[0], -c[1], -c[2], tc[0], tc[1],
 					b[0], b[1], b[2], -b[0], -b[1], -b[2], tb[0], tb[1]);
 			}
+			triangles.push([A, B, C, n]);
+			neighbours[A].push(count);
+			neighbours[B].push(count);
+			neighbours[C].push(count);
+			/*add_adjacency(A, B);
+			add_adjacency(A, C);
+			add_adjacency(B, C);*/
+			count++;
 		}
-		triangles = new Float32Array(triangles);
 		// generate the VBO
 		var map = {
-			vVbo: gl.createBuffer(),
-			vCount: triangles.length / 8,
+			vbo: gl.createBuffer(),
+			count: count * 3,
 			vertices: vertices,
-			vIndex: vIndex,
+			index: index,
 			indices: indices,
 			edges: edges,
 			heights: heights,
 			triangles: triangles,
+			neighbours: neighbours,
+			adjacency: adjacency,
 		};
-		gl.bindBuffer(gl.ARRAY_BUFFER, map.vVbo);
-		gl.bufferData(gl.ARRAY_BUFFER, triangles, gl.STATIC_DRAW);
+		gl.bindBuffer(gl.ARRAY_BUFFER, map.vbo);
+		gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(output), gl.STATIC_DRAW);
 		gl.bindBuffer(gl.ARRAY_BUFFER, null);
 		console.log(iterations,"iterations = ",heights.length,"triangles,",vertices.length,"vertices");
 		return map;
 	},
+	get_adjacency_key: function(A, B) {
+		return "" + Math.min(A, B) + "|" + Math.max(A, B);
+	},
+	makeMinefield: function(n) {
+		var map = this.map,
+			field = [],
+			mines = [],
+			i;
+		for (i=0; i<map.triangles.length; i++) {
+			mines.push(i);
+			field.push(0);
+		}
+		mines = array_shuffle(mines).slice(0, Math.min(n, mines.length));
+		for (i=0; i<mines.length; i++) {
+			field[mines[i]] = "M";
+		}
+		for (var m in mines) {
+			m = mines[m];
+			var triangle = map.triangles[m];
+			for (var c=0; c<3; c++) {
+				var corner = triangle[c];
+				for (var neighbour in map.neighbours[corner]) {
+					neighbour = map.neighbours[corner][neighbour];
+					if (field[neighbour] != "M")
+						field[neighbour]++;
+				}
+			}
+		}
+		return {
+			n: n,
+			mines: mines,
+			field: field,
+		};
+	},
+}
+
+function array_shuffle(array) {
+    var counter = array.length;
+    while (counter > 0) {
+        var index = Math.floor(Math.random() * counter);
+        counter--;
+        var temp = array[counter];
+        array[counter] = array[index];
+        array[index] = temp;
+    }
+    return array;
+}
+
+function array_contains(array, needle) {
+	for (var i in array)
+		if (array[i] == needle)
+			return true;
+	return false;
 }
