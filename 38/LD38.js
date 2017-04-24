@@ -53,6 +53,14 @@ function LD38() {
 		shown: {},
 		triangles: [],
 	};
+	this.highlight = {
+		vbo: gl.createBuffer(),
+		count: 0,
+		hit: -1,
+		lineWidth: 3,
+	};
+	this.zoomDiff = 1;
+	this.toolTip = new UIWindow(false, new UIPanel([new UILabel("", OPAQUE, "label")]));
 }
 
 LD38.prototype = {
@@ -74,16 +82,20 @@ LD38.prototype = {
 		var elapsed = now()-this.lastTick;
 		this.lastTick += elapsed;
 		var scroll_speed = 1000;
-		if(keys[37] && !keys[39]) // left
+		if(keys[37] && !keys[39]) { // left
 			this.camera.eye = vec3_rotate(this.camera.eye, elapsed / scroll_speed, this.camera.centre, vec3_add(this.camera.centre, this.camera.up));
-		else if(keys[39] && !keys[37]) // right
+			this.setHighlight();
+		} else if(keys[39] && !keys[37]) { // right
 			this.camera.eye = vec3_rotate(this.camera.eye, -elapsed / scroll_speed, this.camera.centre, vec3_add(this.camera.centre, this.camera.up));
-		if(keys[38] && !keys[40]) // up
+			this.setHighlight();
+		} if(keys[38] && !keys[40]) { // up
 			this.camera.eye = vec3_rotate(this.camera.eye, elapsed / scroll_speed, this.camera.centre, vec3_add(this.camera.centre, this.camera.right));
-		else if(keys[40] && !keys[38]) // down
+			this.setHighlight();
+		} else if(keys[40] && !keys[38]) { // down
 			this.camera.eye = vec3_rotate(this.camera.eye, -elapsed / scroll_speed, this.camera.centre, vec3_add(this.camera.centre, this.camera.right));
-		// and draw it
-		this.uniforms.mvMatrix = createLookAt(this.camera.eye, this.camera.centre, this.camera.up);
+			this.setHighlight();
+		} // and draw it
+		this.uniforms.mvMatrix = createLookAt(vec3_scale(this.camera.eye, Math.min(2, Math.max(1 - (0.1 * this.iterations), this.zoomDiff))), this.camera.centre, this.camera.up);
 		var self = this;
 		programs.standard(function(program) {
 			gl.bindBuffer(gl.ARRAY_BUFFER, self.map.vbo);
@@ -104,6 +116,18 @@ LD38.prototype = {
 				gl.bindBuffer(gl.ARRAY_BUFFER,null);
 			}, this.uniforms);
 		}
+		if (this.highlight.count) {
+			programs.solidFill(function(program) {
+				gl.bindBuffer(gl.ARRAY_BUFFER, self.highlight.vbo);
+				gl.uniform4fv(program.colour, [1, 0, 0, 1]);
+				gl.vertexAttribPointer(program.vertex, 3, gl.FLOAT, false, 3*4, 0);
+				var oldLineWidth = gl.getParameter(gl.LINE_WIDTH);
+				gl.lineWidth(self.highlight.lineWidth);
+				gl.drawArrays(gl.LINE_LOOP, 0, self.highlight.count);
+				gl.bindBuffer(gl.ARRAY_BUFFER,null);
+				gl.lineWidth(oldLineWidth);
+			}, this.uniforms);
+		}
 	},
 	show: function() {
 		this.onResize();
@@ -118,7 +142,7 @@ LD38.prototype = {
 		this.layout();
 		this.uniforms.pMatrix = new Float32Array(createPerspective(30.0, canvas.width/canvas.height, 0.01, 30));
 	},
-	onMouseDown: function(evt) {
+	onMouseMove: function(evt) {
 		var line = this.mouseRay(evt),
 			ray_origin = line[0],
 			ray_dir = vec3_sub(line[1], line[0]),
@@ -135,11 +159,18 @@ LD38.prototype = {
 				best_dist = hit[0];
 			}
 		}
-		if (best == -1)
+		this.setHighlight(best);
+	},
+	onMouseDown: function(evt) {
+		var t = this.highlight.hit;
+		if (t == -1)
 			return;
-		var open = [best],
-			overlay = this.overlay,
-			neighbours = map.neighbours;
+		var open = [t],
+			map = this.map,
+			triangles = map.triangles,
+			neighbours = map.neighbours,
+			vertices = map.vertices,
+			overlay = this.overlay;
 		while (open.length) {
 			var t = open.pop();
 			if (t in overlay.shown)
@@ -148,7 +179,7 @@ LD38.prototype = {
 			var type = this.minefield.field[t];
 			var tri = triangles[t],
 				a = vertices[tri[0]], b = vertices[tri[1]], c = vertices[tri[2]],
-				colour = this.colours[type];
+				colour = this.colours[type == "M"? type: Math.min(type, 6)];
 			overlay.triangles.push(
 				a[0], a[1], a[2], colour[0], colour[1], colour[2],
 				c[0], c[1], c[2], colour[0], colour[1], colour[2],
@@ -164,6 +195,16 @@ LD38.prototype = {
 		gl.bindBuffer(gl.ARRAY_BUFFER, this.overlay.vbo);
 		gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(this.overlay.triangles), gl.STATIC_DRAW);
 		gl.bindBuffer(gl.ARRAY_BUFFER, null);
+		this.setHighlight();
+		this.setHighlight(t);
+	},
+	onMouseWheel: function(evt, amount) {
+		if(this.isMouseInRect(evt)) {
+			this.zoomDiff += amount / 1000;
+			this.setHighlight();
+			return true;
+		}
+		return false;
 	},
 	uvMapping: function(pt) {
 		pt = vec3_normalise(pt);
@@ -265,13 +306,6 @@ LD38.prototype = {
 			triangles.push(null, null);
 			count += 2;
 		};
-		var add_adjacency = function(A, B) {
-			var key = self.get_adjacency_key(A, B);
-			if (key in adjacency)
-				adjacency[key].push(count);
-			else
-				adjacency[key] = [count];
-		};
 		for (var i=0; i<heights.length; i++) {
 			var A = indices[i*3 + 0], a = vertices[A],
 				B = indices[i*3 + 1], b = vertices[B],
@@ -308,9 +342,6 @@ LD38.prototype = {
 			neighbours[A].push(count);
 			neighbours[B].push(count);
 			neighbours[C].push(count);
-			/*add_adjacency(A, B);
-			add_adjacency(A, C);
-			add_adjacency(B, C);*/
 			count++;
 		}
 		// generate the VBO
@@ -332,8 +363,34 @@ LD38.prototype = {
 		console.log(iterations,"iterations = ",heights.length,"triangles,",vertices.length,"vertices");
 		return map;
 	},
-	get_adjacency_key: function(A, B) {
-		return "" + Math.min(A, B) + "|" + Math.max(A, B);
+	setHighlight: function(t) {
+		if (isNaN(t)) t = -1;
+		if (t == this.highlight.hit)
+			return;
+		this.highlight.hit = t;
+		if (t == -1) {
+			this.highlight.count = 0;
+			this.toolTip.hide();
+		} else {
+			var tri = this.map.triangles[t],
+				vertices = this.map.vertices,
+				a = vertices[tri[0]], b = vertices[tri[1]], c = vertices[tri[2]];
+			gl.bindBuffer(gl.ARRAY_BUFFER, this.highlight.vbo);
+			gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
+				a[0], a[1], a[2],
+				c[0], c[1], c[2],
+				b[0], b[1], b[2]]), gl.STATIC_DRAW);
+			gl.bindBuffer(gl.ARRAY_BUFFER, null);
+			this.highlight.count = 3;
+			var type = this.minefield.field[t];
+			if (type !== 0 && t in this.overlay.shown) {
+				var label =  this.toolTip.find("label");
+				label.setText("" + type);
+				this.toolTip.ctrl.setPos(mousePos);
+				this.toolTip.show();
+			} else
+				this.toolTip.hide();
+		}
 	},
 	makeMinefield: function(n) {
 		var map = this.map,
@@ -342,7 +399,7 @@ LD38.prototype = {
 			i;
 		for (i=0; i<map.triangles.length; i++) {
 			mines.push(i);
-			field.push(0);
+			field.push([]);
 		}
 		mines = array_shuffle(mines).slice(0, Math.min(n, mines.length));
 		for (i=0; i<mines.length; i++) {
@@ -354,11 +411,15 @@ LD38.prototype = {
 			for (var c=0; c<3; c++) {
 				var corner = triangle[c];
 				for (var neighbour in map.neighbours[corner]) {
-					neighbour = map.neighbours[corner][neighbour];
-					if (field[neighbour] != "M")
-						field[neighbour]++;
+					neighbour = field[map.neighbours[corner][neighbour]];
+					if (neighbour != "M" && !array_contains(neighbour, corner))
+						neighbour.push(corner);
 				}
 			}
+		}
+		for (i=0; i<field.length; i++) {
+			if (field[i] != "M")
+				field[i] = field[i].length;
 		}
 		return {
 			n: n,

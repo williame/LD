@@ -458,10 +458,12 @@ UIContext.prototype = {
 					inited = true;
 				}
 				gl.bindTexture(gl.TEXTURE_2D,buffer.texture);
+				if (buffer.colour.length != 4)
+					console.log("bad colour:", buffer.colour);
 				if(colour)
 					gl.uniform4fv(program.colour,[buffer.colour[0]*colour[0],buffer.colour[1]*colour[1],buffer.colour[2]*colour[2],buffer.colour[3]*colour[3]]);
 				else
-					gl.uniform4fv(program.colour,buffer.colour);
+					gl.uniform4fv(program.colour,buffer.colour || OPAQUE);
 				gl.vertexAttribPointer(program.vertex,2,gl.FLOAT,false,16,0);
 				gl.vertexAttribPointer(program.texcoord,2,gl.FLOAT,false,16,8);
 				gl.drawArrays(buffer.mode,buffer.start/4,len/4);
