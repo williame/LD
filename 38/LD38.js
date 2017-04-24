@@ -69,7 +69,7 @@ function LD38() {
 	this.zoomDiff = 1;
 	this.toolTip = new UIWindow(false, new UIPanel([new UILabel("", OPAQUE, "label")]));
 	if (isNaN(this.level)) {
-		this.showMenu(true, false);
+		this.showMenu(true, false, false);
 	} else {
 		UI.addMessage(10, null, "LEFT CLICK to expose the minefield", "help1");
 		UI.addMessage(11, null, "RIGHT CLICK to mark a probable mine", "help2");
@@ -187,7 +187,7 @@ LD38.prototype = {
 	},
 	onKeyDown: function(evt) {
 		if (keys[27])
-			this.showMenu(false,false);
+			this.showMenu(false, false, false);
 	},
 	onMouseDown: function(evt) {
 		var t = this.highlight.hit;
@@ -244,9 +244,10 @@ LD38.prototype = {
 			gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(overlay.triangles), gl.STATIC_DRAW);
 			gl.bindBuffer(gl.ARRAY_BUFFER, null);
 			UI.removeMessage("help1");
-			if (this.minefield.field[t] == "M") {
-				this.showMenu(true, true);
-			}
+			if (this.minefield.field[t] == "M")
+				this.showMenu(true, true, false);
+			else if (overlay.exposed == this.minefield.count)
+				this.showMenu(false, false, true);
 		}
 		this.setHighlight();
 		this.setHighlight(t);
@@ -484,11 +485,13 @@ LD38.prototype = {
 			count: count,
 		};
 	},
-	showMenu: function(newGame, lostGame) {
+	showMenu: function(newGame, lostGame, wonGame) {
 		var menu,
 			ctrls = [];
 		if (lostGame)
 			ctrls.push(new UILabel("sorry you hit a mine!", OPAQUE));
+		else if (wonGame)
+			ctrls.push(new UILabel("CONTRATULATIONS!! YOU WON!!", OPAQUE));
 		ctrls.push(new UIButton("new game: smallest", function() { window.location = "?level=2"; }));
 		ctrls.push(new UIButton("new game: small", function() { window.location = "?level=3"; }));
 		ctrls.push(new UIButton("new game: medium", function() { window.location = "?level=4"; }));
@@ -496,6 +499,8 @@ LD38.prototype = {
 		ctrls.push(new UIButton("new game: crazy", function() { window.location = "?level=6"; }));
 		if (!newGame)
 			ctrls.push(new UIButton("resume current game", function() { menu.hide(); }));
+		ctrls.push(new VSpacer(5));
+		ctrls.push(new UIButton("COMMENT on the game!", function() { window.location = "https://ldjam.com/events/ludum-dare/38/minesweeper/comments"; }));
 		var panel = new UIPanel(ctrls, UILayoutRows);
 		UIViewport.prototype.layout.call(this);
 		menu = new UIWindow(true, panel);
