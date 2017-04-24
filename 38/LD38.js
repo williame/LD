@@ -8,8 +8,8 @@ function LD38() {
 	this.vary_height = false;
 	this.camera = {
 		centre: [0, 0, 0],
-		up: vec3_normalise([0, 1, 1]),
-		right: vec3_normalise([1, 0, 1]),
+		up: vec3_normalise([0, 1, 0]),
+		right: vec3_normalise([0, 0, 1]),
 		eye: [3, 1, 0],
 	};
 	this.uniforms = {
@@ -44,7 +44,7 @@ function LD38() {
 	this.lastTick = now();
 	this.tool = null;
 	this.win = new UIWindow(false, this); // a window to host this viewport in
-	this.iterations = 2;
+	this.iterations = Math.max(2, parseInt(getParameterByName("level")) || 0);
 	this.map = this.makeMap();
 	this.minefield = this.makeMinefield((this.map.triangles.length / 10)|0);
 	this.overlay = {
