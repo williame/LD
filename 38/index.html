@@ -51,6 +51,14 @@ body { border:0px;margin:0px;padding:0px; background-color: black; color: white;
 var logo_filename = "data/LD38_flash_flat2.jpg";
 
 function game() { //### you replace this!  This is called when the framework has finished loading
+	if (!isLocalHost()) {
+		(function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+		  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+		  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+		  })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+		  ga('create', 'UA-27302158-1', 'auto');
+		  ga('send', 'pageview');
+	}
 	var loader = Waiter(function() {
 		window.perf = new Perf(128);
 		var game = new LD38();
@@ -84,14 +92,4 @@ function onVisibilityChange(evt, is_visible) {
 <div class="error">Sorry, you don't have webGL enabled :(</div>
 </canvas>
 </body>
-<script type="text/javascript">
-if (!isLocalHost()) {
-	(function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
-	  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
-	  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
-	  })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
-	  ga('create', 'UA-27302158-1', 'auto');
-	  ga('send', 'pageview');
-}
-</script>
 </html>
